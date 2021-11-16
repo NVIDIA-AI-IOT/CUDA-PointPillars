@@ -1,0 +1,8 @@
+PointpillarsForTensorRT Open Source Software
+Copyright (c) 2021, NVIDIA CORPORATION.
+
+This product includes software developed at
+NVIDIA CORPORATION (https://www.nvidia.com/).
+
+The directory "tool/" of this product contains code derived by open-mmlab/OpenPCDet.
+Apache License 2.0 (https://github.com/open-mmlab/OpenPCDet/blob/master/LICENSE)
