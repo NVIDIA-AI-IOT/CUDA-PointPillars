@@ -16,6 +16,12 @@
 cmake_minimum_required(VERSION 2.8.7)
 set(PROJECT_NAME demo)
 find_package(CUDA REQUIRED)
+include_directories(
+    ${CUDA_INCLUDE_DIRS}
+    ${TENSORRT_INCLUDE_DIRS}
+    ../include/
+    ../include/plugin/
+)
 
 set(CMAKE_C_COMPILER /usr/bin/aarch64-linux-gnu-gcc)
 set(CMAKE_CXX_COMPILER /usr/bin/aarch64-linux-gnu-g++)
@@ -48,13 +54,6 @@ set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}
 
 set(TENSORRT_INCLUDE_DIRS /usr/include/aarch64-linux-gnu/)
 set(TENSORRT_LIBRARY_DIRS /usr/lib/aarch64-linux-gnu/)
-
-include_directories(
-    ${CUDA_INCLUDE_DIRS}
-    ${TENSORRT_INCLUDE_DIRS}
-    ../include/
-    ../include/plugin/
-)
 
 link_directories(
 	${TENSORRT_LIBRARY_DIRS}
