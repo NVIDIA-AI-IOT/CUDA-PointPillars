@@ -39,6 +39,33 @@
 
 std::string Data_File = "../../data/";
 std::string Model_File = "../../model/pointpillar.onnx";
+std::string Save_Dir = Data_File + "box_prediction/";
+
+void SaveBoxPred(std::vector<Bndbox> boxes, std::string file_name)
+{
+    std::ofstream ofs;
+    ofs.open(file_name, std::ios::out);  
+    if (ofs.is_open()) {
+        for (const auto box : boxes) {
+          ofs << box.x << " ";
+          ofs << box.y << " ";
+          ofs << box.z << " ";
+          ofs << box.w << " ";
+          ofs << box.l << " ";
+          ofs << box.h << " ";
+          ofs << box.rt << " ";
+          ofs << box.id << " ";
+          ofs << box.score << " ";
+          ofs << "\n";
+        }
+    }
+    else {
+      std::cerr << "Output file cannot be opened!" << std::endl;
+    }
+    ofs.close();
+    std::cout << "Saved prediction in: " << file_name << std::endl;
+    return;
+};
 
 void Getinfo(void)
 {
@@ -159,6 +186,8 @@ int main(int argc, const char **argv)
     checkCudaErrors(cudaFree(points_data));
 
     std::cout<<"Bndbox objs: "<< nms_pred.size()<<std::endl;
+    std::string save_file_name = Save_Dir + "result_00000" + std::to_string(i) + ".txt";
+    SaveBoxPred(nms_pred, save_file_name);
     nms_pred.clear();
     std::cout << ">>>>>>>>>>>" <<std::endl;
   }
