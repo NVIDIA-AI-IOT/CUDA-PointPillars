@@ -96,6 +96,8 @@ private:
 
     // the x -- output size of the 2D backbone network
     const int feature_x_size_ = 432;
+
+    void *cacheBEV_ = nullptr;
 };
 
 class ScatterBevPluginCreator : public nvinfer1::IPluginCreator

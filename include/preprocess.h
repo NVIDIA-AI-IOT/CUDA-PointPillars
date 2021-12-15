@@ -22,6 +22,7 @@ class PreProcessCuda {
     Params params_;
     unsigned int *mask_;
     float *voxels_;
+    int *voxelsList_;
     float *params_cuda_;
     cudaStream_t stream_ = 0;
 

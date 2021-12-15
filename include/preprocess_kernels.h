@@ -24,7 +24,7 @@
 #define THREADS_FOR_VOXEL 256 // threads number for a block
 #define POINTS_PER_VOXEL 32 //depands on "params.h"
 
-void generateVoxels_launch(float *points, size_t points_size,
+cudaError_t generateVoxels_random_launch(float *points, size_t points_size,
         float min_x_range, float max_x_range,
         float min_y_range, float max_y_range,
         float min_z_range, float max_z_range,
@@ -33,7 +33,16 @@ void generateVoxels_launch(float *points, size_t points_size,
         unsigned int *mask, float *voxels,
         cudaStream_t stream = 0);
 
-void generateBaseFeatures_launch(unsigned int *mask, float *voxels,
+cudaError_t generateVoxels_launch(float *points, size_t points_size,
+        float min_x_range, float max_x_range,
+        float min_y_range, float max_y_range,
+        float min_z_range, float max_z_range,
+        float pillar_x_size, float pillar_y_size, float pillar_z_size,
+        int grid_y_size, int grid_x_size,
+        unsigned int *mask, float *voxels, int *voxelsList,
+        cudaStream_t stream = 0);
+
+cudaError_t generateBaseFeatures_launch(unsigned int *mask, float *voxels,
         int grid_y_size, int grid_x_size,
         unsigned int *pillar_num,
         float *voxel_features,
@@ -46,7 +55,7 @@ void generateBaseFeatures_launch(unsigned int *mask, float *voxels,
 #define WARPS_PER_BLOCK 4 //four warp for one block
 #define FEATURES_SIZE 10 //features maps number depands on "params.h"
 
-int generateFeatures_launch(float* voxel_features,
+cudaError_t generateFeatures_launch(float* voxel_features,
     float* voxel_num_points,
     float* coords,
     unsigned int *params,

@@ -17,14 +17,22 @@ cmake_minimum_required(VERSION 2.8.7)
 set(PROJECT_NAME demo)
 find_package(CUDA REQUIRED)
 
-set(CMAKE_C_COMPILER /usr/bin/aarch64-linux-gnu-gcc)
-set(CMAKE_CXX_COMPILER /usr/bin/aarch64-linux-gnu-g++)
-set(CUDA_TOOLKIT_ROOT_DIR /usr/local/cuda-10.2)
-set(CUDA_INSTALL_TARGET_DIR targets/aarch64-linux)
+if(${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL  "aarch64")
+  set(CMAKE_C_COMPILER /usr/bin/aarch64-linux-gnu-gcc)
+  set(CMAKE_CXX_COMPILER /usr/bin/aarch64-linux-gnu-g++)
+  set(CUDA_INSTALL_TARGET_DIR targets/aarch64-linux)
+elseif(${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "x86_64")
+  set(CMAKE_C_COMPILER /usr/bin/gcc)
+  set(CMAKE_CXX_COMPILER /usr/bin/g++)
+  set(CUDA_INSTALL_TARGET_DIR targets/x86_64-linux)
+endif()
+
+set(CUDA_TOOLKIT_ROOT_DIR /usr/local/cuda)
 set(CUDA_INCLUDE_DIRS ${CUDA_TOOLKIT_ROOT_DIR}/${CUDA_INSTALL_TARGET_DIR}/include)
 
 #add_definitions(-std=c++11)
-SET(CMAKE_BUILD_TYPE "Release")
+set(CMAKE_BUILD_TYPE "Release")
+#set(CMAKE_BUILD_TYPE "Debug")
 add_compile_options(-W)
 add_compile_options(-std=c++11)
 
@@ -45,6 +53,11 @@ set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}
     -Xlinker -L/usr/lib/aarch64-linux-gnu/
     -Xlinker -L/usr/aarch64-linux-gnu/lib/
 )
+
+if(${CMAKE_BUILD_TYPE} STREQUAL "Debug")
+  message("Using Debug Mode")
+  set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} -g -G --ptxas-options=-v)
+endif()
 
 set(TENSORRT_INCLUDE_DIRS /usr/include/aarch64-linux-gnu/)
 set(TENSORRT_LIBRARY_DIRS /usr/lib/aarch64-linux-gnu/)

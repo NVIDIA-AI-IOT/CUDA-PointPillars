@@ -57,7 +57,7 @@ def simplify_onnx(onnx_model):
   first_node_pillarvfe = [node for node in graph.nodes if node.op == "MatMul"][0]
 
   next_node = current_node = first_node_pillarvfe
-  for i in range(6):
+  for i in range(3):
     next_node = [node for node in graph.nodes if node.inputs[0] == current_node.outputs[0]][0]
     current_node = next_node
     #print(next_node)
@@ -89,11 +89,6 @@ def simplify_onnx(onnx_model):
   first_add.inputs[0] = input_new
 
   graph.cleanup().toposort()
-
-  #set axes for squeeze
-  SqueezeNode = [node for node in graph.nodes if node.op == "Squeeze"][0]
-  #print(SqueezeNode)
-  SqueezeNode.attrs["axes"] = 1
 
   return gs.export_onnx(graph)
 

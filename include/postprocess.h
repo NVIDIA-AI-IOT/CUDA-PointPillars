@@ -19,7 +19,10 @@
 
 #include <vector>
 #include "params.h"
-
+/*
+box_encodings: (B, N, 7 + C) or (N, 7 + C) [x, y, z, dx, dy, dz, heading or *[cos, sin], ...]
+anchors: (B, N, 7 + C) or (N, 7 + C) [x, y, z, dx, dy, dz, heading, ...]
+*/
 struct Bndbox {
     float x;
     float y;
@@ -39,14 +42,14 @@ class PostProcessCuda {
   private:
     Params params_;
     float *anchors_;
-    float *anchors_bottom_height_;
+    float *anchor_bottom_heights_;
     int *object_counter_;
     cudaStream_t stream_ = 0;
   public:
     PostProcessCuda(cudaStream_t stream = 0);
     ~PostProcessCuda();
 
-    void doPostprocessCuda(const float *cls_input, float *box_input, const float *dir_cls_input, float *bndbox_output);
+    int doPostprocessCuda(const float *cls_input, float *box_input, const float *dir_cls_input, float *bndbox_output);
 };
 
 int nms_cpu(std::vector<Bndbox> bndboxes, const float nms_thresh, std::vector<Bndbox> &nms_pred);

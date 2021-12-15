@@ -93,6 +93,7 @@ inline void rotate_around_center(const float2 &center, const float angle_cos, co
     float new_x = (p.x - center.x) * angle_cos + (p.y - center.y) * (-angle_sin) + center.x;
     float new_y = (p.x - center.x) * angle_sin + (p.y - center.y) * angle_cos + center.y;
     p = float2 {new_x, new_y};
+    return;
 }
 
 inline float box_overlap(const Bndbox &box_a, const Bndbox &box_b) {
@@ -219,32 +220,34 @@ PostProcessCuda::PostProcessCuda(cudaStream_t stream)
   stream_ = stream;
 
   checkCudaErrors(cudaMalloc((void **)&anchors_, params_.num_anchors * params_.len_per_anchor * sizeof(float)));
-  checkCudaErrors(cudaMalloc((void **)&anchors_bottom_height_, params_.num_classes * sizeof(float)));
+  checkCudaErrors(cudaMalloc((void **)&anchor_bottom_heights_, params_.num_classes * sizeof(float)));
   checkCudaErrors(cudaMalloc((void **)&object_counter_, sizeof(int)));
 
   checkCudaErrors(cudaMemcpyAsync(anchors_, params_.anchors,
         params_.num_anchors * params_.len_per_anchor * sizeof(float), cudaMemcpyDefault, stream_));
-  checkCudaErrors(cudaMemcpyAsync(anchors_bottom_height_, params_.anchors_bottom_height, 
+  checkCudaErrors(cudaMemcpyAsync(anchor_bottom_heights_, params_.anchor_bottom_heights,
                      params_.num_classes * sizeof(float), cudaMemcpyDefault, stream_));
   checkCudaErrors(cudaMemsetAsync(object_counter_, 0, sizeof(int), stream_));
+  return;
 }
 
 PostProcessCuda::~PostProcessCuda()
 {
   checkCudaErrors(cudaFree(anchors_));
-  checkCudaErrors(cudaFree(anchors_bottom_height_));
+  checkCudaErrors(cudaFree(anchor_bottom_heights_));
   checkCudaErrors(cudaFree(object_counter_));
+  return;
 }
 
-void PostProcessCuda::doPostprocessCuda(const float *cls_input, float *box_input, const float *dir_cls_input,
+int PostProcessCuda::doPostprocessCuda(const float *cls_input, float *box_input, const float *dir_cls_input,
                                         float *bndbox_output)
 {
   checkCudaErrors(cudaMemsetAsync(object_counter_, 0, sizeof(int)));
-  postprocess_launch(cls_input,
+  checkCudaErrors(postprocess_launch(cls_input,
                      box_input,
                      dir_cls_input,
                      anchors_,
-                     anchors_bottom_height_,
+                     anchor_bottom_heights_,
                      bndbox_output,
                      object_counter_,
                      params_.min_x_range,
@@ -259,6 +262,6 @@ void PostProcessCuda::doPostprocessCuda(const float *cls_input, float *box_input
                      params_.score_thresh,
                      params_.dir_offset,
                      stream_
-                     );
-
+                     ));
+  return 0;
 }

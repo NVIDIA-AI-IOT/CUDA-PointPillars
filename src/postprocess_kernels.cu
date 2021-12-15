@@ -36,7 +36,7 @@ __global__ void postprocess_kernal(const float *cls_input,
                                         float *box_input,
                                         const float *dir_cls_input,
                                         float *anchors,
-                                        float *anchors_bottom_height,
+                                        float *anchor_bottom_heights,
                                         float *bndbox_output,
                                         int *object_counter,
                                         const float min_x_range,
@@ -61,7 +61,7 @@ __global__ void postprocess_kernal(const float *cls_input,
   int row = loc_index / feature_x_size;
   float x_offset = min_x_range + col * (max_x_range - min_x_range) / (feature_x_size - 1);
   float y_offset = min_y_range + row * (max_y_range - min_y_range) / (feature_y_size - 1);
-  int cls_offset = loc_index * num_classes * num_anchors + ith_anchor * num_classes;
+  int cls_offset = loc_index * num_anchors * num_classes + ith_anchor * num_classes;
   float dev_cls[2] = {-1, 0};
 
   const float *scores = cls_input + cls_offset;
@@ -82,7 +82,7 @@ __global__ void postprocess_kernal(const float *cls_input,
     int box_offset = loc_index * num_anchors * num_box_values + ith_anchor * num_box_values;
     int dir_cls_offset = loc_index * num_anchors * 2 + ith_anchor * 2;
     float *anchor_ptr = anchors + ith_anchor * 4;
-    float z_offset = anchor_ptr[2] / 2 + anchors_bottom_height[ith_anchor / 2];
+    float z_offset = anchor_ptr[2] / 2 + anchor_bottom_heights[ith_anchor / 2];
     float anchor[7] = {x_offset, y_offset, z_offset, anchor_ptr[0], anchor_ptr[1], anchor_ptr[2], anchor_ptr[3]};
     float *box_encodings = box_input + box_offset;
 
@@ -124,12 +124,11 @@ __global__ void postprocess_kernal(const float *cls_input,
   }
 }
 
-
-void  postprocess_launch(const float *cls_input,
+cudaError_t postprocess_launch(const float *cls_input,
                       float *box_input,
                       const float *dir_cls_input,
                       float *anchors,
-                      float *anchors_bottom_height,
+                      float *anchor_bottom_heights,
                       float *bndbox_output,
                       int *object_counter,
                       const float min_x_range,
@@ -154,7 +153,7 @@ void  postprocess_launch(const float *cls_input,
                  box_input,
                  dir_cls_input,
                  anchors,
-                 anchors_bottom_height,
+                 anchor_bottom_heights,
                  bndbox_output,
                  object_counter,
                  min_x_range,
@@ -168,6 +167,6 @@ void  postprocess_launch(const float *cls_input,
                  num_box_values,
                  score_thresh,
                  dir_offset);
-  checkCudaErrors(cudaGetLastError());
+  return cudaGetLastError();
 }
 

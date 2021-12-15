@@ -17,11 +17,11 @@
 #ifndef POSTPROCESS_KERNELS_H_
 #define POSTPROCESS_KERNELS_H_
 
-void  postprocess_launch(const float *cls_input,
+cudaError_t postprocess_launch(const float *cls_input,
                       float *box_input,
                       const float *dir_cls_input,
                       float *anchors,
-                      float *anchors_bottom_height,
+                      float *anchor_bottom_heights,
                       float *bndbox_output,
                       int *object_counter,
                       const float min_x_range,

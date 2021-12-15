@@ -29,6 +29,7 @@ from pcdet.utils import common_utils
 import onnx
 from onnxsim import simplify
 import os, sys
+from exporter_paramters import export_paramters as export_paramters
 from simplifier_onnx import simplify_onnx as simplify_onnx
 
 class DemoDataset(DatasetTemplate):
@@ -89,6 +90,7 @@ def parse_config():
 
 def main():
     args, cfg = parse_config()
+    export_paramters(cfg)
     logger = common_utils.create_logger()
     logger.info('------ Convert OpenPCDet model for TensorRT ------')
     demo_dataset = DemoDataset(

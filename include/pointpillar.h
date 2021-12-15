@@ -44,14 +44,13 @@ class TRT {
   private:
     Params params_;
 
-    cudaEvent_t start, stop;
+    cudaEvent_t start_, stop_;
 
-    float elapsedTime = 0.0f;
     Logger gLogger_;
-    nvinfer1::IExecutionContext *context = nullptr;
-    nvinfer1::ICudaEngine *engine = nullptr;
+    nvinfer1::IExecutionContext *context_ = nullptr;
+    nvinfer1::ICudaEngine *engine_ = nullptr;
 
-    cudaStream_t stream_;
+    cudaStream_t stream_ = 0;
   public:
     TRT(std::string modelFile, cudaStream_t stream = 0);
     ~TRT(void);
@@ -63,8 +62,7 @@ class PointPillar {
   private:
     Params params_;
 
-    cudaEvent_t start, stop;
-    float elapsedTime = 0.0f;
+    cudaEvent_t start_, stop_;
     cudaStream_t stream_;
 
     std::shared_ptr<PreProcessCuda> pre_;
@@ -72,33 +70,33 @@ class PointPillar {
     std::shared_ptr<PostProcessCuda> post_;
 
     //input of pre-process
-    float *voxel_features = nullptr;
-    float *voxel_num_points = nullptr;
-    float *coords = nullptr;
-    unsigned int *pillar_num = nullptr;
+    float *voxel_features_ = nullptr;
+    float *voxel_num_points_ = nullptr;
+    float *coords_ = nullptr;
+    unsigned int *pillar_num_ = nullptr;
 
-    unsigned int voxel_features_size;
-    unsigned int voxel_num_points_size;
-    unsigned int coords_size;
+    unsigned int voxel_features_size_ = 0;
+    unsigned int voxel_num_points_size_ = 0;
+    unsigned int coords_size_ = 0;
 
     //TRT-input
-    float *features_input = nullptr;
-    unsigned int *params_input = nullptr;
-    unsigned int features_input_size;
+    float *features_input_ = nullptr;
+    unsigned int *params_input_ = nullptr;
+    unsigned int features_input_size_ = 0;
 
     //output of TRT -- input of post-process
-    float *cls_output = nullptr;
-    float *box_output = nullptr;
-    float *dir_cls_output = nullptr;
-    unsigned int cls_size;
-    unsigned int box_size;
-    unsigned int dir_cls_size;
+    float *cls_output_ = nullptr;
+    float *box_output_ = nullptr;
+    float *dir_cls_output_ = nullptr;
+    unsigned int cls_size_;
+    unsigned int box_size_;
+    unsigned int dir_cls_size_;
 
     //output of post-process
-    float *bndbox_output = nullptr;
-    unsigned int bndbox_size = 0;
+    float *bndbox_output_ = nullptr;
+    unsigned int bndbox_size_ = 0;
 
-    std::vector<Bndbox> res;
+    std::vector<Bndbox> res_;
 
   public:
     PointPillar(std::string modelFile, cudaStream_t stream = 0);

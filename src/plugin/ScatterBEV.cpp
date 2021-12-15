@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 #include <cassert>
-
+#include <iostream>
 #include "ScatterBEV.h"
 #include "ScatterBEV_kernels.h"
 /**
@@ -115,44 +115,51 @@ bool ScatterBevPlugin::supportsFormatCombination(
     {
         return (in.type == nvinfer1::DataType::kFLOAT) && (in.format == TensorFormat::kLINEAR);
     }
+    return false;
 }
 
 void ScatterBevPlugin::configurePlugin(const nvinfer1::DynamicPluginTensorDesc* in, int nbInputs,
     const nvinfer1::DynamicPluginTensorDesc* out, int nbOutputs) noexcept
 {
-    cutelog("wow I run to here now");
+  cutelog("wow I run to here now");
 }
 
 size_t ScatterBevPlugin::getWorkspaceSize(const nvinfer1::PluginTensorDesc* inputs, int nbInputs,
     const nvinfer1::PluginTensorDesc* outputs, int nbOutputs) const noexcept
 {
-    cutelog("wow I run to here now");
-    return 0;
+  cutelog("wow I run to here now");
+  unsigned int cacheBEVSize = inputs[0].dims.d[0]
+                                * inputs[0].dims.d[2] * sizeof(float);
+  return cacheBEVSize;
 }
+
 int ScatterBevPlugin::enqueue(const nvinfer1::PluginTensorDesc* inputDesc,
     const nvinfer1::PluginTensorDesc* outputDesc, const void* const* inputs, void* const* outputs, void* workspace,
     cudaStream_t stream) noexcept
 {
   cutelog("wow I run to here now");
 
-  const float *pillar_features_data = (const float *)(inputs[0]);
-  const float *coords_data = (const float *)(inputs[1]);
-  const unsigned int *params_data = (const unsigned int *)(inputs[2]);
-
-  //cudaMemcpyAsync(paramsPtr, params_data, 5*sizeof(int), cudaMemcpyDefault, stream);
-
   unsigned int batch = 1;
   unsigned int featureNum = featureNum_;
   unsigned int featureY = feature_y_size_;
   unsigned int featureX = feature_x_size_;
 
+  const float *in = (const float *)inputs[0];
+  const float *coords_data = (const float *)(inputs[1]);
+  const unsigned int *params_data = (const unsigned int *)(inputs[2]);
   float *spatial_feature_data = (float *)(outputs[0]);
 
-  cudaMemsetAsync(spatial_feature_data, 0, batch*featureNum*featureY*featureX * sizeof(float), stream);
+  unsigned int count = inputDesc[0].dims.d[0];
+  cacheBEV_ = workspace;
+  const float *pillar_features_data = (const float *)(cacheBEV_);
 
-  scatterBEV_kernel_launcher(pillar_features_data, coords_data, params_data, featureX, featureY, spatial_feature_data, stream);
+  //cudaMemcpyAsync(paramsPtr, params_data, 5*sizeof(int), cudaMemcpyDefault, stream);
 
-  return 1;
+  checkCudaErrors(cudaMemsetAsync(spatial_feature_data, 0, batch*featureNum*featureY*featureX * sizeof(float), stream));
+  checkCudaErrors(reduceMax_kernel_launcher((const float*)in, (float*)pillar_features_data, count, stream));
+  checkCudaErrors(scatterBEV_kernel_launcher(pillar_features_data, coords_data, params_data, featureX, featureY, spatial_feature_data, stream));
+
+  return 0;
 }
 
 // IPluginV2Ext Methods
