@@ -52,7 +52,7 @@ $ ./demo
 | ----------------- | ------ |
 | generateVoxels    | 0.22   |
 | generateFeatures  | 0.21   |
-| Inference         | 30.75  |
+| Inference         | 23.86  |
 | Postprocessing    | 3.19   |
 ```
 ## Note
