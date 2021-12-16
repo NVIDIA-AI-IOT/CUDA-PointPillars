@@ -32,6 +32,7 @@ To build the pointpillars inference, **TensorRT** with PillarScatter layer and *
 $ cd test
 $ mkdir build
 $ cd build
+$ cmake .
 $ make -j$(nproc)
 ```
 
