@@ -108,7 +108,7 @@ void PreProcessCuda::generateVoxels_cpu(float* points, size_t points_size,
       voxel_idx = voxel_num;
       voxel_num += 1;
       coor_to_voxelidx[indexZ][indexY][indexX] = voxel_idx;
-      // coors type: 0,z,y,z
+      // coors type: 0,z,y,x
       coors[voxel_idx*num_features+0+1] = indexZ;
       coors[voxel_idx*num_features+1+1] = indexY;
       coors[voxel_idx*num_features+2+1] = indexX;
