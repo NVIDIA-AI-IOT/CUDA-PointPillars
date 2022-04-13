@@ -82,25 +82,25 @@ cudaError_t scatterBEV_kernel_launcher(const float *pillar_features_data,
 __global__ void reduceMax_kernel(const float *in,
               float *out, unsigned int pillarCount)
 {
-  int pillar_idx = (blockIdx.x * blockDim.x + threadIdx.x)/32;
+  int pillar_idx = blockIdx.x * blockDim.x + threadIdx.x;
   if(pillar_idx >= pillarCount) return;
 
-  int point_idx = threadIdx.x%32;
+  int feat_idx = threadIdx.y;
 
   //__shared__ float2 pillarSM[POINTS_PER_PILLAR]; //pillar*64
 
   unsigned int indexIn = pillar_idx*POINTS_PER_PILLAR*FEATURE_SIZE
                           + 0*FEATURE_SIZE
-                          + point_idx * 2;
+                          + feat_idx * 2;
   float2 outFeature = *((float2*)(in + indexIn));
   for (int i = 1; i < POINTS_PER_PILLAR; i++)
   {
-    indexIn = pillar_idx*POINTS_PER_PILLAR*FEATURE_SIZE + i*FEATURE_SIZE + point_idx * 2;
+    indexIn = pillar_idx*POINTS_PER_PILLAR*FEATURE_SIZE + i*FEATURE_SIZE + feat_idx * 2;
     float2 maxFeature = *((float2*)(in + indexIn));
     outFeature.x = max(outFeature.x, maxFeature.x);
     outFeature.y = max(outFeature.y, maxFeature.y);
   }
-  unsigned int indexOut = pillar_idx*FEATURE_SIZE + point_idx*2;
+  unsigned int indexOut = pillar_idx*FEATURE_SIZE + feat_idx*2;
   outFeature.x = max(outFeature.x, 0.0);
   outFeature.y = max(outFeature.y, 0.0);
   *((float2*)(out + indexOut)) = outFeature;
@@ -111,8 +111,9 @@ cudaError_t reduceMax_kernel_launcher(const float *in,
               float *out, unsigned int pillarCount,
               cudaStream_t stream)
 {
-  dim3 threads(4*POINTS_PER_PILLAR);
-  dim3 blocks((pillarCount*POINTS_PER_PILLAR+threads.x-1) / threads.x);
+  assert(FEATURE_SIZE%2 == 0);
+  dim3 threads(4, FEATURE_SIZE/2);
+  dim3 blocks((pillarCount+threads.x-1) / threads.x);
 
   reduceMax_kernel<<<blocks, threads, 0, stream>>>
     (in, out, pillarCount);
