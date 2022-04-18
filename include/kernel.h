@@ -63,15 +63,6 @@ cudaError_t generateVoxels_random_launch(float *points, size_t points_size,
         unsigned int *mask, float *voxels,
         cudaStream_t stream = 0);
 
-cudaError_t generateVoxels_launch(float *points, size_t points_size,
-        float min_x_range, float max_x_range,
-        float min_y_range, float max_y_range,
-        float min_z_range, float max_z_range,
-        float pillar_x_size, float pillar_y_size, float pillar_z_size,
-        int grid_y_size, int grid_x_size,
-        unsigned int *mask, float *voxels, int *voxelsList,
-        cudaStream_t stream = 0);
-
 cudaError_t generateBaseFeatures_launch(unsigned int *mask, float *voxels,
         int grid_y_size, int grid_x_size,
         unsigned int *pillar_num,

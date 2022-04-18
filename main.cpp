@@ -37,8 +37,8 @@
     }                                                             \
 }
 
-std::string Data_File = "../../data/";
-std::string Model_File = "../../model/pointpillar.onnx";
+std::string Data_File = "../data/";
+std::string Model_File = "../model/pointpillar.onnx";
 
 void Getinfo(void)
 {

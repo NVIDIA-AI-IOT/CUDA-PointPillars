@@ -107,8 +107,6 @@ def main():
 
       MAX_VOXELS = 10000
 
-      batch_size = 1
-
       dummy_voxels = torch.zeros(
           (MAX_VOXELS, 32, 4),
           dtype=torch.float32,
@@ -134,14 +132,13 @@ def main():
           input_names = ['voxels', 'voxel_num', 'voxel_idxs'],   # the model's input names
           output_names = ['cls_preds', 'box_preds', 'dir_cls_preds'], # the model's output names
           )
+
       onnx_model = onnx.load("./pointpillar_raw.onnx")  # load onnx model
       model_simp, check = simplify(onnx_model)
       assert check, "Simplified ONNX model could not be validated"
 
-
       model_simp = simplify_onnx(model_simp)
       onnx.save(model_simp, "pointpillar.onnx")
-      print("export pointpillar.onnx.")
       print('finished exporting onnx')
 
     logger.info('Demo done.')

@@ -14,23 +14,21 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+#include "pointpillar.h"
 #include <iostream>
 #include <fstream>
 #include <vector>
-
 #include <cuda_runtime.h>
-
 #include "NvInfer.h"
 #include "NvOnnxConfig.h"
 #include "NvOnnxParser.h"
 #include "NvInferRuntime.h"
 
-#include "pointpillar.h"
-
 TRT::~TRT(void)
 {
-  context_->destroy();
-  engine_->destroy();
+  delete(context_);
+  delete(engine_);
   checkCudaErrors(cudaEventDestroy(start_));
   checkCudaErrors(cudaEventDestroy(stop_));
   return;

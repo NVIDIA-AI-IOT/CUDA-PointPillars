@@ -75,15 +75,6 @@ int PreProcessCuda::generateVoxels(float *points, size_t points_size,
   float pillar_y_size = params_.pillar_y_size;
   float pillar_z_size = params_.pillar_z_size;
 
-#if 0
-  checkCudaErrors(generateVoxels_launch(points, points_size,
-        min_x_range, max_x_range,
-        min_y_range, max_y_range,
-        min_z_range, max_z_range,
-        pillar_x_size, pillar_y_size, pillar_z_size,
-        grid_y_size, grid_x_size,
-        mask_, voxels_, voxelsList_, stream_));
-#else
   checkCudaErrors(generateVoxels_random_launch(points, points_size,
         min_x_range, max_x_range,
         min_y_range, max_y_range,
@@ -91,7 +82,7 @@ int PreProcessCuda::generateVoxels(float *points, size_t points_size,
         pillar_x_size, pillar_y_size, pillar_z_size,
         grid_y_size, grid_x_size,
         mask_, voxels_, stream_));
-#endif
+
   checkCudaErrors(generateBaseFeatures_launch(mask_, voxels_,
       grid_y_size, grid_x_size,
       pillar_num,

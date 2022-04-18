@@ -73,7 +73,6 @@ cudaError_t generateVoxels_random_launch(float *points, size_t points_size,
   return err;
 }
 
-//<<PreProcessCuda::generateVoxels
 __global__ void generateVoxelsList_kernel(float *points, size_t points_size,
         float min_x_range, float max_x_range,
         float min_y_range, float max_y_range,
@@ -105,35 +104,6 @@ __global__ void generateVoxelsList_kernel(float *points, size_t points_size,
 
 }
 
-void generateVoxelsList_cpu(float *points, size_t points_size,
-        unsigned int *mask, int *voxelsList)
-{
-  cudaDeviceSynchronize();
-  for(int point_idx = points_size-1; point_idx>=0; point_idx--)
-  {
-    //float4 point = ((float4*)points)[point_idx];
-    int voxel_index = voxelsList[point_idx];
-    if(voxel_index ==-1) continue;
-    int count = mask[voxel_index];
-    //printf("idx:%d voxel_index %d count: %d\n",point_idx, voxel_index, count);
-    if(count>32)
-    {
-      voxelsList[point_idx] = -1;
-      mask[voxel_index]--;
-      continue;
-    }
-
-    //clear mask buffer
-    if(count==0) continue;
-    if(count<=32)
-    {
-      mask[voxel_index]=0;
-      continue;
-    }
-  }
-  return;
-}
-
 __global__ void generateVoxels_kernel(float *points, size_t points_size,
         int *voxelsList,
         unsigned int *mask, float *voxels)
@@ -162,8 +132,8 @@ __global__ void generateBaseFeatures_kernel(unsigned int *mask, float *voxels,
         unsigned int *voxel_num,
         unsigned int *voxel_idxs)
 {
-  int voxel_idx = blockIdx.x * blockDim.x + threadIdx.x;
-  int voxel_idy = blockIdx.y * blockDim.y + threadIdx.y;
+  unsigned int voxel_idx = blockIdx.x * blockDim.x + threadIdx.x;
+  unsigned int voxel_idy = blockIdx.y * blockDim.y + threadIdx.y;
 
   if(voxel_idx >= grid_x_size ||voxel_idy >= grid_y_size) return;
 
@@ -188,43 +158,10 @@ __global__ void generateBaseFeatures_kernel(unsigned int *mask, float *voxels,
   }
 
   // clear buffer for next infer
-  //mask[voxel_index] = 0;
   atomicExch(mask + voxel_index, 0);
 }
 
-cudaError_t generateVoxels_launch(float *points, size_t points_size,
-        float min_x_range, float max_x_range,
-        float min_y_range, float max_y_range,
-        float min_z_range, float max_z_range,
-        float pillar_x_size, float pillar_y_size, float pillar_z_size,
-        int grid_y_size, int grid_x_size,
-        unsigned int *mask, float *voxels, int *voxelsList,
-        cudaStream_t stream)
-{
-  int threadNum = THREADS_FOR_VOXEL;
-  dim3 blocks((points_size+threadNum-1)/threadNum);
-  dim3 threads(threadNum);
-  generateVoxelsList_kernel<<<blocks, threads, 0, stream>>>
-    (points, points_size,
-        min_x_range, max_x_range,
-        min_y_range, max_y_range,
-        min_z_range, max_z_range,
-        pillar_x_size, pillar_y_size, pillar_z_size,
-        grid_y_size, grid_x_size,
-        mask, voxelsList);
-
-  generateVoxelsList_cpu(points, points_size,
-        mask, voxelsList);
-
-  generateVoxels_kernel<<<blocks, threads, 0, stream>>>
-    (points, points_size,
-        voxelsList,
-        mask, voxels);
-  cudaError_t err = cudaGetLastError();
-  return err;
-}
-
-/* create 4 channels*/
+// create 4 channels
 cudaError_t generateBaseFeatures_launch(unsigned int *mask, float *voxels,
         int grid_y_size, int grid_x_size,
         unsigned int *pillar_num,
@@ -246,10 +183,8 @@ cudaError_t generateBaseFeatures_launch(unsigned int *mask, float *voxels,
   cudaError_t err = cudaGetLastError();
   return err;
 }
-//PreProcessCuda::generateVoxels>>
 
-
-//<<generateFeatures 4 channels -> 10 channels
+// 4 channels -> 10 channels
 __global__ void generateFeatures_kernel(float* voxel_features,
     unsigned int* voxel_num, unsigned int* voxel_idxs, unsigned int *params,
     float voxel_x, float voxel_y, float voxel_z,
@@ -374,5 +309,3 @@ cudaError_t generateFeatures_launch(float* voxel_features,
     cudaError_t err = cudaGetLastError();
     return err;
 }
-//generateFeatures>>
-
