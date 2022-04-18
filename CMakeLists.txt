@@ -14,7 +14,7 @@
 # limitations under the License.
 
 cmake_minimum_required(VERSION 2.8.7)
-set(PROJECT_NAME demo)
+project(demo)
 find_package(CUDA REQUIRED)
 
 if(${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL  "aarch64")
@@ -31,6 +31,7 @@ set(CUDA_TOOLKIT_ROOT_DIR /usr/local/cuda)
 set(CUDA_INCLUDE_DIRS ${CUDA_TOOLKIT_ROOT_DIR}/${CUDA_INSTALL_TARGET_DIR}/include)
 
 set(CMAKE_BUILD_TYPE "Release")
+set(CMAKE_CXX_FLAGS_RELEASE "-Wno-deprecated-declarations -O2")
 add_compile_options(-W)
 add_compile_options(-std=c++11)
 
@@ -63,7 +64,7 @@ set(TENSORRT_LIBRARY_DIRS /usr/lib/aarch64-linux-gnu/)
 include_directories(
     ${CUDA_INCLUDE_DIRS}
     ${TENSORRT_INCLUDE_DIRS}
-    ../include/
+    include
 )
 
 link_directories(
@@ -73,8 +74,8 @@ link_directories(
 )
 
 file(GLOB_RECURSE SOURCE_FILES
-    ../src/*.cu
-    ../src/*.cpp
+    src/*.cu
+    src/*.cpp
 )
 
 cuda_add_executable(${PROJECT_NAME} main.cpp ${SOURCE_FILES})

@@ -110,7 +110,7 @@ def export_paramters(cfg):
   fo = open("params.h","w")
   fo.write(License+"\n")
   fo.write("#ifndef PARAMS_H_\n#define PARAMS_H_\n")
-  fo.write("#define MAX_VOXELS "+str(MAX_NUMBER_OF_VOXELS)+"\n")
+  fo.write("const int MAX_VOXELS = "+str(MAX_NUMBER_OF_VOXELS)+";\n")
 
   fo.write("class Params\n{\n  public:\n")
 
