@@ -14,28 +14,12 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+
+#include "postprocess.h"
 #include <iostream>
 #include <vector>
 #include <algorithm>
 #include <math.h>
-
-#include <cuda_runtime_api.h>
-
-#include "postprocess.h"
-#include "postprocess_kernels.h"
-
-#define checkCudaErrors(status)                                   \
-{                                                                 \
-  if (status != 0)                                                \
-  {                                                               \
-    std::cout << "Cuda failure: " << cudaGetErrorString(status)   \
-              << " at line " << __LINE__                          \
-              << " in file " << __FILE__                          \
-              << " error status: " << status                      \
-              << std::endl;                                       \
-              abort();                                            \
-    }                                                             \
-}
 
 const float ThresHold = 1e-8;
 

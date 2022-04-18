@@ -18,7 +18,7 @@
 #include <fstream>
 #include <vector>
 
-#include "cuda_runtime.h"
+#include <cuda_runtime.h>
 
 #include "NvInfer.h"
 #include "NvOnnxConfig.h"
@@ -26,19 +26,6 @@
 #include "NvInferRuntime.h"
 
 #include "pointpillar.h"
-
-#define checkCudaErrors(status)                                   \
-{                                                                 \
-  if (status != 0)                                                \
-  {                                                               \
-    std::cout << "Cuda failure: " << cudaGetErrorString(status)   \
-              << " at line " << __LINE__                          \
-              << " in file " << __FILE__                          \
-              << " error status: " << status                      \
-              << std::endl;                                       \
-              abort();                                            \
-    }                                                             \
-}
 
 TRT::~TRT(void)
 {
@@ -172,28 +159,26 @@ PointPillar::PointPillar(std::string modelFile, cudaStream_t stream):stream_(str
   trt_.reset(new TRT(modelFile, stream_));
   post_.reset(new PostProcessCuda(stream_));
 
-  //input of pre-process
+  //point cloud to voxels
   voxel_features_size_ = MAX_VOXELS * params_.max_num_points_per_pillar * 4 * sizeof(float);
-  voxel_num_points_size_ = MAX_VOXELS * sizeof(float);
-  coords_size_ = MAX_VOXELS* 4 * sizeof(float);
+  voxel_num_size_ = MAX_VOXELS * sizeof(unsigned int);
+  voxel_idxs_size_ = MAX_VOXELS* 4 * sizeof(unsigned int);
 
   checkCudaErrors(cudaMallocManaged((void **)&voxel_features_, voxel_features_size_));
-  checkCudaErrors(cudaMallocManaged((void **)&voxel_num_points_, voxel_num_points_size_));
-  checkCudaErrors(cudaMallocManaged((void **)&coords_, MAX_VOXELS* 4 * sizeof(float)));
+  checkCudaErrors(cudaMallocManaged((void **)&voxel_num_, voxel_num_size_));
+  checkCudaErrors(cudaMallocManaged((void **)&voxel_idxs_, voxel_idxs_size_));
 
   checkCudaErrors(cudaMemsetAsync(voxel_features_, 0, voxel_features_size_, stream_));
-  checkCudaErrors(cudaMemsetAsync(voxel_num_points_, 0, voxel_num_points_size_, stream_));
-  checkCudaErrors(cudaMemsetAsync(coords_, 0, MAX_VOXELS* 4 * sizeof(float), stream_));
-
+  checkCudaErrors(cudaMemsetAsync(voxel_num_, 0, voxel_num_size_, stream_));
+  checkCudaErrors(cudaMemsetAsync(voxel_idxs_, 0, voxel_idxs_size_, stream_));
 
   //TRT-input
   features_input_size_ = MAX_VOXELS * params_.max_num_points_per_pillar * 10 * sizeof(float);
   checkCudaErrors(cudaMallocManaged((void **)&features_input_, features_input_size_));
-  checkCudaErrors(cudaMallocManaged((void **)&params_input_, 5 * sizeof(unsigned int)));
+  checkCudaErrors(cudaMallocManaged((void **)&params_input_, sizeof(unsigned int)));
 
   checkCudaErrors(cudaMemsetAsync(features_input_, 0, features_input_size_, stream_));
-  checkCudaErrors(cudaMemsetAsync(params_input_, 0, 5 * sizeof(float), stream_));
-
+  checkCudaErrors(cudaMemsetAsync(params_input_, 0, sizeof(unsigned int), stream_));
 
   //output of TRT -- input of post-process
   cls_size_ = params_.feature_x_size * params_.feature_y_size * params_.num_classes * params_.num_anchors * sizeof(float);
@@ -207,7 +192,6 @@ PointPillar::PointPillar(std::string modelFile, cudaStream_t stream):stream_(str
   bndbox_size_ = (params_.feature_x_size * params_.feature_y_size * params_.num_anchors * 9 + 1) * sizeof(float);
   checkCudaErrors(cudaMallocManaged((void **)&bndbox_output_, bndbox_size_));
 
-  //res.resize(100);
   res_.reserve(100);
   return;
 }
@@ -219,8 +203,8 @@ PointPillar::~PointPillar(void)
   post_.reset();
 
   checkCudaErrors(cudaFree(voxel_features_));
-  checkCudaErrors(cudaFree(voxel_num_points_));
-  checkCudaErrors(cudaFree(coords_));
+  checkCudaErrors(cudaFree(voxel_num_));
+  checkCudaErrors(cudaFree(voxel_idxs_));
 
   checkCudaErrors(cudaFree(features_input_));
   checkCudaErrors(cudaFree(params_input_));
@@ -243,46 +227,29 @@ int PointPillar::doinfer(void*points_data, unsigned int points_size, std::vector
   checkCudaErrors(cudaEventRecord(start_, stream_));
 #endif
 
-#if GENERATE_VOXELS_BY_CPU
-  pre_->clearCacheCPU();
-  pre_->generateVoxels_cpu((float*)points_data, points_size,
-        params_input,
-        voxel_features, 
-        voxel_num_points_,
-        coords);
-  checkCudaErrors(cudaDeviceSynchronize());
-#else
   pre_->generateVoxels((float*)points_data, points_size,
         params_input_,
         voxel_features_, 
-        voxel_num_points_,
-        coords_);
-#endif
+        voxel_num_,
+        voxel_idxs_);
 
 #if PERFORMANCE_LOG
   checkCudaErrors(cudaEventRecord(stop_, stream_));
   checkCudaErrors(cudaDeviceSynchronize());
   checkCudaErrors(cudaEventElapsedTime(&generateVoxelsTime, start_, stop_));
-  unsigned int params_input_cpu[5];
-  checkCudaErrors(cudaMemcpy(params_input_cpu, params_input_, 5*sizeof(unsigned int), cudaMemcpyDefault));
-  std::cout<<"find pillar_num: "<< params_input_cpu[4] <<std::endl;
+  unsigned int params_input_cpu;
+  checkCudaErrors(cudaMemcpy(&params_input_cpu, params_input_, sizeof(unsigned int), cudaMemcpyDefault));
+  std::cout<<"find pillar_num: "<< params_input_cpu <<std::endl;
 #endif
-/*
-  unsigned int num_pillars = *pillar_num;
-  params_input[0] = 1;
-  params_input[1] = params_.num_feature_scatter;//featureNum;
-  params_input[2] = params_.grid_y_size;//featureY;
-  params_input[3] = params_.grid_x_size;//featureX;
-  params_input[4] = num_pillars;//num_pillars;
-*/
+
 #if PERFORMANCE_LOG
   float generateFeaturesTime = 0.0f;
   checkCudaErrors(cudaEventRecord(start_, stream_));
 #endif
 
   pre_->generateFeatures(voxel_features_,
-      voxel_num_points_,
-      coords_,
+      voxel_num_,
+      voxel_idxs_,
       params_input_,
       features_input_);
 
@@ -297,9 +264,9 @@ int PointPillar::doinfer(void*points_data, unsigned int points_size, std::vector
   checkCudaErrors(cudaEventRecord(start_, stream_));
 #endif
 
-  void *buffers[] = {features_input_, coords_, params_input_, cls_output_, box_output_, dir_cls_output_};
+  void *buffers[] = {features_input_, voxel_idxs_, params_input_, cls_output_, box_output_, dir_cls_output_};
   trt_->doinfer(buffers);
-  checkCudaErrors(cudaMemsetAsync(params_input_, 0, 5 * sizeof(unsigned int), stream_));
+  checkCudaErrors(cudaMemsetAsync(params_input_, 0, sizeof(unsigned int), stream_));
 
 #if PERFORMANCE_LOG
   checkCudaErrors(cudaEventRecord(stop_, stream_));
@@ -345,4 +312,3 @@ int PointPillar::doinfer(void*points_data, unsigned int points_size, std::vector
 #endif
   return 0;
 }
-

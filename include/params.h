@@ -16,7 +16,7 @@
  */
 #ifndef PARAMS_H_
 #define PARAMS_H_
-#define MAX_VOXELS 40000
+const int MAX_VOXELS = 40000;
 class Params
 {
   public:

@@ -30,17 +30,15 @@ endif()
 set(CUDA_TOOLKIT_ROOT_DIR /usr/local/cuda)
 set(CUDA_INCLUDE_DIRS ${CUDA_TOOLKIT_ROOT_DIR}/${CUDA_INSTALL_TARGET_DIR}/include)
 
-#add_definitions(-std=c++11)
 set(CMAKE_BUILD_TYPE "Release")
-#set(CMAKE_BUILD_TYPE "Debug")
 add_compile_options(-W)
 add_compile_options(-std=c++11)
 
-set( SMS 30 32 35 37 50 52 53 60 61 62 70 72 75)
+set( SMS 30 32 35 37 50 52 53 60 61 62 70 72 75 87)
 foreach(sm ${SMS})
 	set(GENCODE ${GENCODE} -gencode arch=compute_${sm},code=sm_${sm})
 endforeach()
-set(HIGHEST_SM 75)
+set(HIGHEST_SM 87)
 set(GENCODE ${GENCODE} -gencode arch=compute_${HIGHEST_SM},code=compute_${HIGHEST_SM})
 
 set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}
@@ -66,7 +64,6 @@ include_directories(
     ${CUDA_INCLUDE_DIRS}
     ${TENSORRT_INCLUDE_DIRS}
     ../include/
-    ../include/plugin/
 )
 
 link_directories(

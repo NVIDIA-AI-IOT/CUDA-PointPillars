@@ -34,8 +34,11 @@ def replace_with_clip(self, inputs, outputs):
     for out in outputs:
         out.inputs.clear()
 
+    op_attrs = dict()
+    op_attrs["dense_shape"] = np.array([496,432])
+
     # Insert the new node.
-    return self.layer(op="ScatterBEV", inputs=inputs, outputs=outputs)
+    return self.layer(name="PillarScatter_0", op="PillarScatterPlugin", inputs=inputs, outputs=outputs, attrs=op_attrs)
 
 def simplify_onnx(onnx_model):
   print("Use onnx_graphsurgeon to modify onnx...")
@@ -45,22 +48,35 @@ def simplify_onnx(onnx_model):
   tmap = graph.tensors()
   tmp_inputs = graph.inputs
 
-  MAX_VOXELS = tmap["input"].shape[0]
-  #print(tmap["input"].shape[0])
+  MAX_VOXELS = tmap["voxels"].shape[0]
+  print(tmap["voxels"].shape[0])
 
-  input_new = gs.Variable(name="input", dtype=np.float32, shape=(MAX_VOXELS, 32, 10))
-  X = gs.Variable(name="coords", dtype=np.float32, shape=(1, 1, MAX_VOXELS, 4))
-  Y = gs.Variable(name="params", dtype=np.float32, shape=(1, 1, 1, 5))
+  # voxels: [V, P, C']
+  # V is the maximum number of voxels per frame
+  # P is the maximum number of points per voxel
+  # C' is the number of channels(features) per point in voxels.
+  input_new = gs.Variable(name="voxels", dtype=np.float32, shape=(MAX_VOXELS, 32, 10))
+
+  # voxel_idxs: [V, 4]
+  # V is the maximum number of voxels per frame
+  # 4 is just the length of indexs encoded as (frame_id, z, y, x).
+  X = gs.Variable(name="voxel_idxs", dtype=np.int32, shape=(MAX_VOXELS, 4))
+
+  # voxel_num: [1]
+  # Gives valid voxels number for each frame
+  Y = gs.Variable(name="voxel_num", dtype=np.int32, shape=(1,))
 
   first_node_after_pillarscatter = [node for node in graph.nodes if node.op == "Conv"][0]
 
   first_node_pillarvfe = [node for node in graph.nodes if node.op == "MatMul"][0]
 
   next_node = current_node = first_node_pillarvfe
-  for i in range(3):
+  for i in range(6):
     next_node = [node for node in graph.nodes if node.inputs[0] == current_node.outputs[0]][0]
+    if i == 5:              # ReduceMax
+      current_node.attrs['keepdims'] = [0]
+      break
     current_node = next_node
-    #print(next_node)
 
   last_node_pillarvfe = current_node
 

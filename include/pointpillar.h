@@ -25,7 +25,6 @@
 #include "postprocess.h"
 #include "preprocess.h"
 
-#define GENERATE_VOXELS_BY_CPU 0
 #define PERFORMANCE_LOG 1
 
 // Logger for TensorRT
@@ -71,13 +70,13 @@ class PointPillar {
 
     //input of pre-process
     float *voxel_features_ = nullptr;
-    float *voxel_num_points_ = nullptr;
-    float *coords_ = nullptr;
+    unsigned int *voxel_num_ = nullptr;
+    unsigned int *voxel_idxs_ = nullptr;
     unsigned int *pillar_num_ = nullptr;
 
     unsigned int voxel_features_size_ = 0;
-    unsigned int voxel_num_points_size_ = 0;
-    unsigned int coords_size_ = 0;
+    unsigned int voxel_num_size_ = 0;
+    unsigned int voxel_idxs_size_ = 0;
 
     //TRT-input
     float *features_input_ = nullptr;

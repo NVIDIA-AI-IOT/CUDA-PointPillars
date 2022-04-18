@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-#include "params.h"
+#include "kernel.h"
 
 class PreProcessCuda {
   private:
@@ -26,9 +26,6 @@ class PreProcessCuda {
     float *params_cuda_;
     cudaStream_t stream_ = 0;
 
-    //points cloud -> voxels (BEV) -> feature*4 by CPU
-    int *coor_to_voxelidx_ = nullptr;
-
   public:
     PreProcessCuda(cudaStream_t stream_ = 0);
     ~PreProcessCuda();
@@ -37,23 +34,14 @@ class PreProcessCuda {
     int generateVoxels(float *points, size_t points_size,
         unsigned int *pillar_num,
         float *voxel_features,
-        float *voxel_num_points,
-        float *coords);
+        unsigned int *voxel_num,
+        unsigned int *voxel_idxs);
 
     //feature*4 -> feature * 10 
     int generateFeatures(float* voxel_features,
-          float* voxel_num_points,
-          float* coords,
+          unsigned int *voxel_num,
+          unsigned int* voxel_idxs,
           unsigned int *params,
           float* features);
-
-    //points cloud -> voxels (BEV) -> feature*4 by CPU
-    int clearCacheCPU(void);
-    void generateVoxels_cpu(float* points, size_t points_size,
-        unsigned int* pillarCount,
-        float* voxel_features,
-        float* voxel_num_points,
-        float* coords);
-
 };
 

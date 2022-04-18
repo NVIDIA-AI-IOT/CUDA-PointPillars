@@ -18,7 +18,8 @@
 #define POSTPROCESS_H_
 
 #include <vector>
-#include "params.h"
+#include "kernel.h"
+
 /*
 box_encodings: (B, N, 7 + C) or (N, 7 + C) [x, y, z, dx, dy, dz, heading or *[cos, sin], ...]
 anchors: (B, N, 7 + C) or (N, 7 + C) [x, y, z, dx, dy, dz, heading, ...]

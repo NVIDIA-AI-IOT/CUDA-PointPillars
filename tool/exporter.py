@@ -109,32 +109,32 @@ def main():
 
       batch_size = 1
 
-      dummy_voxel_features = torch.zeros(
+      dummy_voxels = torch.zeros(
           (MAX_VOXELS, 32, 4),
           dtype=torch.float32,
           device='cuda:0')
 
-      dummy_voxel_num_points = torch.zeros(
-          (MAX_VOXELS),
-          dtype=torch.float32,
+      dummy_voxel_idxs = torch.zeros(
+          (MAX_VOXELS, 4),
+          dtype=torch.int32,
           device='cuda:0')
 
-      dummy_coords = torch.zeros(
-          (MAX_VOXELS, 4),
-          dtype=torch.float32,
+      dummy_voxel_num = torch.zeros(
+          (MAX_VOXELS),
+          dtype=torch.int32,
           device='cuda:0')
 
       torch.onnx.export(model,                   # model being run
-          (dummy_voxel_features, dummy_voxel_num_points, dummy_coords), # model input (or a tuple for multiple inputs)
-          "./pointpillar.onnx",    # where to save the model (can be a file or file-like object)
+          (dummy_voxels, dummy_voxel_num, dummy_voxel_idxs), # model input (or a tuple for multiple inputs)
+          "./pointpillar_raw.onnx",    # where to save the model (can be a file or file-like object)
           export_params=True,        # store the trained parameter weights inside the model file
           opset_version=11,          # the ONNX version to export the model to
           do_constant_folding=True,  # whether to execute constant folding for optimization
           keep_initializers_as_inputs=True,
-          input_names = ['input', 'voxel_num_points', 'coords'],   # the model's input names
+          input_names = ['voxels', 'voxel_num', 'voxel_idxs'],   # the model's input names
           output_names = ['cls_preds', 'box_preds', 'dir_cls_preds'], # the model's output names
           )
-      onnx_model = onnx.load("./pointpillar.onnx")  # load onnx model
+      onnx_model = onnx.load("./pointpillar_raw.onnx")  # load onnx model
       model_simp, check = simplify(onnx_model)
       assert check, "Simplified ONNX model could not be validated"
 
