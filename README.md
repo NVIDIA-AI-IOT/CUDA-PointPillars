@@ -1,27 +1,23 @@
-# PointPillars inference with TensorRT
+# PointPillars Inference with TensorRT
 This repository contains sources and model for [pointpillars](https://arxiv.org/abs/1812.05784) inference using TensorRT.
-The model is created by [OpenPCDet](https://github.com/open-mmlab/OpenPCDet) and modified by onnx_graphsurgeon.
+The model is created with [OpenPCDet](https://github.com/open-mmlab/OpenPCDet) and modified with onnx_graphsurgeon.
 
-Inference has four phases:
-- Convert points cloud into 4 channles voxels
-- Extend raw c=4 voxels to c=10 voxel features
+Overall inference has four phases:
+- Convert points cloud into 4-channle voxels
+- Extend 4-channel voxels to 10-channel voxel features
 - Run TensorRT engine to get 3D-detection raw data
 - Parse bounding box, class type and direction
 
 ## Model && Data
 The demo use the velodyne data from KITTI Dataset.
-The onnx file can be converted from [pre-trained model](https://drive.google.com/file/d/1wMxWTpU1qUoY3DsCH31WJmvJxcjFXKlm/view) with given script.
+The onnx file can be converted from [pre-trained model](https://drive.google.com/file/d/1wMxWTpU1qUoY3DsCH31WJmvJxcjFXKlm/view) with given script under "./tool".
 
 ### Prerequisites
 To build the pointpillars inference, **TensorRT** with PillarScatter layer and **CUDA** are needed. PillarScatter layer plugin is already implemented as a plugin for TRT in the demo.
 
-## Enviroments
-- Nvidia Jetson AGX Orin
-- Jetpack 5.0
-- CUDA 11.4
-- TensorRT 8.4.0
-- cuDNN 8.3.2
-- [optional] PCL
+## Environments
+- Nvidia Jetson AGX Orin + Jetpack 5.0
+- CUDA 11.4 + cuDNN 8.3.2 + TensorRT 8.4.0
 
 ### Compile && Run
 ```shell
@@ -47,5 +43,3 @@ $ ./demo
 
 ## References
 - [PointPillars: Fast Encoders for Object Detection from Point Clouds](https://arxiv.org/abs/1812.05784)
-- [OpenPCDet](https://github.com/open-mmlab/OpenPCDet)
-- [Autoware-AI/core_perception](https://github.com/Autoware-AI/core_perception)
