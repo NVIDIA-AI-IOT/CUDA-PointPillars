@@ -38,10 +38,11 @@ Release
 
 #### Performance in FP16
 ```
-| Function(unit:ms) | Orin   |
-| ----------------- | ------ |
-| generateVoxels    | 0.14   |
-| generateFeatures  | 0.15   |
-| Inference         | 9.12   |
-| Postprocessing    | 1.77   |
+| Function(unit:ms) | Xavier | Orin   |
+| ----------------- | ------ | ------ |
+| GenerateVoxels    | 0.29   | 0.14   |
+| GenerateFeatures  | 0.31   | 0.15   |
+| Inference         | 20.21  | 9.12   |
+| Postprocessing    | 3.38   | 1.77   |
+| Overall           | 24.19  | 11.18  |
 ```
