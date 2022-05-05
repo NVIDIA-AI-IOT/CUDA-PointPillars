@@ -13,24 +13,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import argparse
 import glob
-from pathlib import Path
-
-import numpy as np
-import torch
-
-from numpy import *
-from pcdet.config import cfg, cfg_from_yaml_file
-from pcdet.datasets import DatasetTemplate
-from pcdet.models import build_network, load_data_to_gpu
-from pcdet.utils import common_utils
-
 import onnx
+import torch
+import argparse
+import numpy as np
+
+from pathlib import Path
 from onnxsim import simplify
-import os, sys
+from pcdet.utils import common_utils
+from pcdet.models import build_network
+from pcdet.datasets import DatasetTemplate
+from pcdet.config import cfg, cfg_from_yaml_file
+
 from exporter_paramters import export_paramters as export_paramters
-from simplifier_onnx import simplify_onnx as simplify_onnx
+from simplifier_onnx import simplify_preprocess, simplify_postprocess
 
 class DemoDataset(DatasetTemplate):
     def __init__(self, dataset_cfg, class_names, training=True, root_path=None, logger=None, ext='.bin'):
@@ -71,7 +68,6 @@ class DemoDataset(DatasetTemplate):
         data_dict = self.prepare_data(data_dict=input_dict)
         return data_dict
 
-
 def parse_config():
     parser = argparse.ArgumentParser(description='arg parser')
     parser.add_argument('--cfg_file', type=str, default='cfgs/kitti_models/pointpillar.yaml',
@@ -86,7 +82,6 @@ def parse_config():
     cfg_from_yaml_file(args.cfg_file, cfg)
 
     return args, cfg
-
 
 def main():
     args, cfg = parse_config()
@@ -122,9 +117,15 @@ def main():
           dtype=torch.int32,
           device='cuda:0')
 
-      torch.onnx.export(model,                   # model being run
-          (dummy_voxels, dummy_voxel_num, dummy_voxel_idxs), # model input (or a tuple for multiple inputs)
-          "./pointpillar_raw.onnx",    # where to save the model (can be a file or file-like object)
+      dummy_input = dict()
+      dummy_input['voxels'] = dummy_voxels
+      dummy_input['voxel_num_points'] = dummy_voxel_num
+      dummy_input['voxel_coords'] = dummy_voxel_idxs
+      dummy_input['batch_size'] = 1
+
+      torch.onnx.export(model,       # model being run
+          dummy_input,               # model input (or a tuple for multiple inputs)
+          "./pointpillar_raw.onnx",  # where to save the model (can be a file or file-like object)
           export_params=True,        # store the trained parameter weights inside the model file
           opset_version=11,          # the ONNX version to export the model to
           do_constant_folding=True,  # whether to execute constant folding for optimization
@@ -133,15 +134,17 @@ def main():
           output_names = ['cls_preds', 'box_preds', 'dir_cls_preds'], # the model's output names
           )
 
-      onnx_model = onnx.load("./pointpillar_raw.onnx")  # load onnx model
-      model_simp, check = simplify(onnx_model)
+      onnx_raw = onnx.load("./pointpillar_raw.onnx")  # load onnx model
+      onnx_trim_post = simplify_postprocess(onnx_raw)
+      
+      onnx_simp, check = simplify(onnx_trim_post)
       assert check, "Simplified ONNX model could not be validated"
 
-      model_simp = simplify_onnx(model_simp)
-      onnx.save(model_simp, "pointpillar.onnx")
+      onnx_final = simplify_preprocess(onnx_simp)
+      onnx.save(onnx_final, "pointpillar.onnx")
       print('finished exporting onnx')
 
-    logger.info('Demo done.')
+    logger.info('[PASS] ONNX EXPORTED.')
 
 if __name__ == '__main__':
     main()
