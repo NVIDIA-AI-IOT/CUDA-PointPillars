@@ -1,11 +1,5 @@
-#import mayavi.mlab as mlab
-import torch
-from numpy import *
 import numpy as np
-import math
-from pcdet.config import cfg, cfg_from_yaml_file
-
-#print("Graph.fold_constants Help:\n{}".format(gs.Graph.fold_constants.__doc__))
+from pcdet.config import cfg
 
 License = '''/*
  * SPDX-FileCopyrightText: Copyright (c) 2021 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
@@ -24,11 +18,7 @@ License = '''/*
  * limitations under the License.
  */'''
 
-
 def export_paramters(cfg):
-  print("########")
-
-  #parameters list
   CLASS_NAMES = []
   CLASS_NUM = 0
   rangMinX = 0
@@ -52,42 +42,29 @@ def export_paramters(cfg):
 
   CLASS_NAMES = cfg.CLASS_NAMES
   CLASS_NUM = len(CLASS_NAMES)
-  print(CLASS_NAMES)
-  print(CLASS_NUM)
 
-  #initiate paramters
   rangMinX = cfg.DATA_CONFIG.POINT_CLOUD_RANGE[0]
   rangMinY = cfg.DATA_CONFIG.POINT_CLOUD_RANGE[1]
   rangMinZ = cfg.DATA_CONFIG.POINT_CLOUD_RANGE[2]
   rangMaxX = cfg.DATA_CONFIG.POINT_CLOUD_RANGE[3]
   rangMaxY = cfg.DATA_CONFIG.POINT_CLOUD_RANGE[4]
   rangMaxZ = cfg.DATA_CONFIG.POINT_CLOUD_RANGE[5]
-  print(rangMinX, rangMinY, rangMinZ, rangMaxX, rangMaxY, rangMaxZ)
 
-  for item in cfg.DATA_CONFIG.DATA_PROCESSOR :
+  for item in cfg.DATA_CONFIG.DATA_PROCESSOR:
     if (item.NAME == "transform_points_to_voxels") :
       VOXEL_SIZE = item.VOXEL_SIZE
       MAX_POINTS_PER_VOXEL = item.MAX_POINTS_PER_VOXEL
       MAX_NUMBER_OF_VOXELS = item.MAX_NUMBER_OF_VOXELS.test
-      print(VOXEL_SIZE)
-      print(MAX_POINTS_PER_VOXEL)
-      print(MAX_NUMBER_OF_VOXELS)
 
   for item in cfg.DATA_CONFIG.DATA_AUGMENTOR.AUG_CONFIG_LIST :
     if (item.NAME == "gt_sampling") :
       NUM_POINT_FEATURES = item.NUM_POINT_FEATURES
-      print(NUM_POINT_FEATURES)
 
   NUM_BEV_FEATURES = cfg.MODEL.MAP_TO_BEV.NUM_BEV_FEATURES
   DIR_OFFSET = cfg.MODEL.DENSE_HEAD.DIR_OFFSET
   DIR_LIMIT_OFFSET = cfg.MODEL.DENSE_HEAD.DIR_LIMIT_OFFSET
   NUM_DIR_BINS = cfg.MODEL.DENSE_HEAD.NUM_DIR_BINS
-  print(NUM_BEV_FEATURES)
-  print(DIR_OFFSET)
-  print(DIR_LIMIT_OFFSET)
-  print(NUM_DIR_BINS)
 
-  ANCHOR_GENERATOR_CONFIG = cfg.MODEL.DENSE_HEAD.ANCHOR_GENERATOR_CONFIG
   for item in cfg.MODEL.DENSE_HEAD.ANCHOR_GENERATOR_CONFIG :
     for anchor in np.array(item.anchor_sizes).flatten() :
       anchor_sizes.append(float(anchor))
@@ -98,15 +75,10 @@ def export_paramters(cfg):
     for anchor_height in np.array(item.anchor_bottom_heights).flatten() :
       anchor_bottom_heights.append(anchor_height)
 
-  print(anchor_sizes)
-  print(anchor_bottom_heights)
-
   SCORE_THRESH = cfg.MODEL.POST_PROCESSING.SCORE_THRESH
   NMS_THRESH = cfg.MODEL.POST_PROCESSING.NMS_CONFIG.NMS_THRESH
-  print(SCORE_THRESH)
-  print(NMS_THRESH)
 
-  #store paramters
+  # dump paramters to params.h
   fo = open("params.h","w")
   fo.write(License+"\n")
   fo.write("#ifndef PARAMS_H_\n#define PARAMS_H_\n")
@@ -164,9 +136,6 @@ def export_paramters(cfg):
     anchor_heights = anchor_heights + str(float(item)) +","
   anchor_heights = anchor_heights + "};\n"
   fo.write(anchor_heights)
-
-  print("anchors: ", anchor_str)
-  print("anchors: ", anchor_heights)
   fo.write("    // the score threshold for classification\n")
   fo.write("    const float score_thresh = "+str(float(SCORE_THRESH))+";\n")
   fo.write("    const float nms_thresh = "+str(float(NMS_THRESH))+";\n")
@@ -185,12 +154,9 @@ def export_paramters(cfg):
     const int feature_y_size = grid_y_size / 2;\n'''
   )
 
-
   fo.write("    Params() {};\n};\n")
   fo.write("#endif\n")
   fo.close()
-  print("########")
 
 if __name__ == '__main__':
   export_paramters(cfg)
-

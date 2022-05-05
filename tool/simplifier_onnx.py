@@ -13,43 +13,72 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#import mayavi.mlab as mlab
-import torch
-from numpy import *
-import numpy as np
-
-from onnxsim import simplify
 import onnx
+import numpy as np
 import onnx_graphsurgeon as gs
-
-#print("Graph.fold_constants Help:\n{}".format(gs.Graph.fold_constants.__doc__))
 
 @gs.Graph.register()
 def replace_with_clip(self, inputs, outputs):
-    # Disconnect output nodes of all input tensors
     for inp in inputs:
         inp.outputs.clear()
 
-    # Disconnet input nodes of all output tensors
     for out in outputs:
         out.inputs.clear()
 
     op_attrs = dict()
     op_attrs["dense_shape"] = np.array([496,432])
 
-    # Insert the new node.
     return self.layer(name="PillarScatter_0", op="PillarScatterPlugin", inputs=inputs, outputs=outputs, attrs=op_attrs)
 
-def simplify_onnx(onnx_model):
+def loop_node(graph, current_node, loop_time=0):
+  for i in range(loop_time):
+    next_node = [node for node in graph.nodes if len(node.inputs) != 0 and len(current_node.outputs) != 0 and node.inputs[0] == current_node.outputs[0]][0]
+    current_node = next_node
+  return next_node
+
+def simplify_postprocess(onnx_model):
+  print("Use onnx_graphsurgeon to adjust postprocessing part in the onnx...")
+  graph = gs.import_onnx(onnx_model)
+
+  cls_preds = gs.Variable(name="cls_preds", dtype=np.float32, shape=(1, 248, 216, 18))
+  box_preds = gs.Variable(name="box_preds", dtype=np.float32, shape=(1, 248, 216, 42))
+  dir_cls_preds = gs.Variable(name="dir_cls_preds", dtype=np.float32, shape=(1, 248, 216, 12))
+
+  tmap = graph.tensors()
+  new_inputs = [tmap["voxels"], tmap["voxel_idxs"], tmap["voxel_num"]]
+  new_outputs = [cls_preds, box_preds, dir_cls_preds]
+
+  for inp in graph.inputs:
+    if inp not in new_inputs:
+      inp.outputs.clear()
+
+  for out in graph.outputs:
+    out.inputs.clear()
+
+  first_ConvTranspose_node = [node for node in graph.nodes if node.op == "ConvTranspose"][0]
+  concat_node = loop_node(graph, first_ConvTranspose_node, 3)
+  assert concat_node.op == "Concat"
+
+  first_node_after_concat = [node for node in graph.nodes if len(node.inputs) != 0 and len(concat_node.outputs) != 0 and node.inputs[0] == concat_node.outputs[0]]
+
+  for i in range(3):
+    transpose_node = loop_node(graph, first_node_after_concat[i], 1)
+    assert transpose_node.op == "Transpose"
+    transpose_node.outputs = [new_outputs[i]]
+
+  graph.inputs = new_inputs
+  graph.outputs = new_outputs
+  graph.cleanup().toposort()
+  
+  return gs.export_onnx(graph)
+
+
+def simplify_preprocess(onnx_model):
   print("Use onnx_graphsurgeon to modify onnx...")
-  # Now we'll do the actual replacement
   graph = gs.import_onnx(onnx_model)
 
   tmap = graph.tensors()
-  tmp_inputs = graph.inputs
-
   MAX_VOXELS = tmap["voxels"].shape[0]
-  print(tmap["voxels"].shape[0])
 
   # voxels: [V, P, C']
   # V is the maximum number of voxels per frame
@@ -93,13 +122,9 @@ def simplify_onnx(onnx_model):
   graph.inputs = [first_node_pillarvfe.inputs[0] , X, Y]
   graph.outputs = [tmap["cls_preds"], tmap["box_preds"], tmap["dir_cls_preds"]]
 
-  # Notice that we do not need to manually modify the rest of the graph. ONNX GraphSurgeon will
-  # take care of removing any unnecessary nodes or tensors, so that we are left with only the subgraph.
   graph.cleanup()
-  # That's it!
 
-  #Remane the first tensor for the first layer 
-
+  #Rename the first tensor for the first layer 
   graph.inputs = [input_new, X, Y]
   first_add = [node for node in graph.nodes if node.op == "MatMul"][0]
   first_add.inputs[0] = input_new
@@ -110,5 +135,4 @@ def simplify_onnx(onnx_model):
 
 if __name__ == '__main__':
     mode_file = "pointpillar-native-sim.onnx"
-    simplify_onnx(onnx.load(mode_file))
-
+    simplify_preprocess(onnx.load(mode_file))
