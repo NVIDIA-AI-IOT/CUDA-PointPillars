@@ -98,7 +98,8 @@ bool PillarScatterPlugin::supportsFormatCombination(
     }
     if (pos == 3)
     {
-        return (in.type == inOut[0].type) && (in.format == TensorFormat::kLINEAR || in.format == TensorFormat::kHWC8);
+        return (inOut[0].type == nvinfer1::DataType::kFLOAT && in.type == nvinfer1::DataType::kFLOAT && in.format == TensorFormat::kLINEAR)
+            || (inOut[0].type == nvinfer1::DataType::kHALF  && in.type == nvinfer1::DataType::kHALF  && in.format == TensorFormat::kHWC8);
     }
     return false;
 }
@@ -137,7 +138,7 @@ int PillarScatterPlugin::enqueue(const nvinfer1::PluginTensorDesc* inputDesc,
             auto pillar_features_data = static_cast<const half *>(inputs[0]);
             auto spatial_feature_data = static_cast<half *>(outputs[0]);
             cudaMemsetAsync(spatial_feature_data, 0, numFeatures*featureY*featureX * sizeof(half), stream);
-            status = pillarScatterKernelLaunch<half>(
+            status = pillarScatterHalfKernelLaunch(
                 maxPillarNum,
                 numFeatures,
                 pillar_features_data,
@@ -155,7 +156,7 @@ int PillarScatterPlugin::enqueue(const nvinfer1::PluginTensorDesc* inputDesc,
             auto pillar_features_data = static_cast<const float *>(inputs[0]);
             auto spatial_feature_data = static_cast<float *>(outputs[0]);
             cudaMemsetAsync(spatial_feature_data, 0, numFeatures*featureY*featureX * sizeof(float), stream);
-            status = pillarScatterKernelLaunch<float>(
+            status = pillarScatterFloatKernelLaunch(
                 maxPillarNum,
                 numFeatures,
                 pillar_features_data,
@@ -277,7 +278,7 @@ IPluginV2* PillarScatterPluginCreator::createPlugin(const char* name, const Plug
             target_w = ts[1];
         }
     }
-    IPluginV2* plugin = new PillarScatterPlugin(
+    auto* plugin = new PillarScatterPlugin(
         target_h,
         target_w
     );
@@ -288,7 +289,7 @@ IPluginV2* PillarScatterPluginCreator::deserializePlugin(
     const char* name, const void* serialData, size_t serialLength) noexcept
 {
     // This object will be deleted when the network is destroyed,
-    IPluginV2* plugin = new PillarScatterPlugin(serialData, serialLength);
+    auto* plugin = new PillarScatterPlugin(serialData, serialLength);
     return plugin;
 }
 
