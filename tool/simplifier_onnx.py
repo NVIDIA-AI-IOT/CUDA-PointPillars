@@ -26,7 +26,7 @@ def replace_with_clip(self, inputs, outputs):
         out.inputs.clear()
 
     op_attrs = dict()
-    op_attrs["dense_shape"] = np.array([248,216])
+    op_attrs["dense_shape"] = np.array([496,432])
 
     return self.layer(name="PillarScatter_0", op="PillarScatterPlugin", inputs=inputs, outputs=outputs, attrs=op_attrs)
 
