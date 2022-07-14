@@ -46,6 +46,15 @@ Set Jetson to power mode with "sudo nvpmodel -m 0 && sudo jetson_clocks"
 | Overall           | 24.19  | 11.18  |
 ```
 
+3D detection performance of moderate difficulty on the val set of KITTI dataset.
+
+```
+|                   | Car@R11 | Pedestrian@R11 | Cyclist@R11  | 
+| ----------------- | --------| -------------- | ------------ |
+| CUDA-PointPillars | 77.02   | 51.65          | 62.24        |
+| OpenPCDet         | 77.28   | 52.29          | 62.68        |
+```
+
 ## Note
 
 - GenerateVoxels has random output since GPU processes all points simultaneously while points selection for a voxel is random.

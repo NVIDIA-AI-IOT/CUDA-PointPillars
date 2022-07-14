@@ -91,7 +91,7 @@ kitti
 (kitti_eval)$ python kitti_format.py
 ```
 
-- Run kitti-object-eval-python(https://github.com/traveller59/kitti-object-eval-python)
+- Run evaluation kit on prediction and pcdet outputs
 
 ```
 (kitti_eval)$ python ./kitti-object-eval-python/evaluate.py evaluate --label_path=./kitti/object/training/label_2/ --result_path=./kitti/object/pred --label_split_file=./val.txt --current_class=0,1,2 --coco=False
@@ -159,3 +159,9 @@ bev  AP:86.25, 70.30, 66.33
 aos  AP:84.49, 70.66, 66.65
 
 ```
+
+## References
+
+- [PointPillars: Fast Encoders for Object Detection from Point Clouds](https://arxiv.org/abs/1812.05784)
+- [kitti-object-eval-python](https://github.com/traveller59/kitti-object-eval-python)
+- [kitti_object_vis](https://github.com/kuixu/kitti_object_vis)
