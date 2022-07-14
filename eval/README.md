@@ -2,10 +2,11 @@
 
 ## Dataset
 
-Download the data (calib, image\_2, label\_2, velodyne) from [Kitti Object Detection Dataset](http://www.cvlibs.net/datasets/kitti/eval_object.php?obj_benchmark=3d) and place it in your data folder at `kitti/object`
-
+Download the data (calib, image\_2, label\_2, velodyne) from [Kitti Object Detection Dataset](http://www.cvlibs.net/datasets/kitti/eval_object.php?obj_benchmark=3d) and place it in your data folder at `kitti/object`.
+Note that in order to get the similar mAP compariable to OpenPCDet, we shall use pruned pointcloud in camera FOV. Then
 
 The folder structure is as following:
+
 ```
 kitti
     object
@@ -14,7 +15,7 @@ kitti
         pred
             000000.txt
         pred_velo
-            result_000000.txt
+            000000.txt
         testing
             calib
                000000.txt
@@ -44,6 +45,7 @@ kitti
 ### Install spconv-1.0
 
 - Start from a new conda enviornment:
+
 ```
 (base)$ conda create -n kitti_eval python=3.6
 (base)$ conda activate kitti_eval
@@ -52,6 +54,7 @@ kitti
 ```
 
 - Fetch spconv-1.0 code
+
 ```
 (kitti_eval)$ git clone https://github.com/traveller59/spconv spconv_8da6f96 --recursive
 (kitti_eval)$ cd spconv_8da6f96/
@@ -60,6 +63,7 @@ kitti
 ```
 
 - Build wheel and install spconv-1.0
+
 ```
 (kitti_eval)$ python setup.py bdist_wheel
 (kitti_eval)$ cd dist/ && pip install *.
@@ -68,6 +72,7 @@ kitti
 ### Install second-1.5.1
 
 - Fetch second-1.5.1 code and install dependency
+
 ```
 (kitti_eval)$ git clone https://github.com/traveller59/second.pytorch.git
 (kitti_eval)$ cd second.pytorch/
@@ -78,14 +83,16 @@ kitti
 ```
 
 ### Run evaluation kit
- 
+
 - Format prediction and pcdet data into kitti format
+
 ```
 (kitti_eval)$ cd /path_to_eval
 (kitti_eval)$ python kitti_format.py
 ```
 
 - Run kitti-object-eval-python(https://github.com/traveller59/kitti-object-eval-python)
+
 ```
 (kitti_eval)$ python ./kitti-object-eval-python/evaluate.py evaluate --label_path=./kitti/object/training/label_2/ --result_path=./kitti/object/pred --label_split_file=./val.txt --current_class=0,1,2 --coco=False
 Car AP(Average Precision)@0.70, 0.70, 0.70:

@@ -38,6 +38,7 @@
 }
 
 std::string Data_File = "../data/";
+std::string Save_Dir = "../eval/kitti/object/pred_velo/";
 std::string Model_File = "../model/pointpillar.onnx";
 
 void Getinfo(void)
@@ -96,6 +97,32 @@ int loadData(const char *file, void **data, unsigned int *length)
   return 0;  
 }
 
+void SaveBoxPred(std::vector<Bndbox> boxes, std::string file_name)
+{
+    std::ofstream ofs;
+    ofs.open(file_name, std::ios::out);
+    if (ofs.is_open()) {
+        for (const auto box : boxes) {
+          ofs << box.x << " ";
+          ofs << box.y << " ";
+          ofs << box.z << " ";
+          ofs << box.w << " ";
+          ofs << box.l << " ";
+          ofs << box.h << " ";
+          ofs << box.rt << " ";
+          ofs << box.id << " ";
+          ofs << box.score << " ";
+          ofs << "\n";
+        }
+    }
+    else {
+      std::cerr << "Output file cannot be opened!" << std::endl;
+    }
+    ofs.close();
+    std::cout << "Saved prediction in: " << file_name << std::endl;
+    return;
+};
+
 int main(int argc, const char **argv)
 {
   Getinfo();
@@ -123,8 +150,10 @@ int main(int argc, const char **argv)
 
     ss<< i;
 
-    dataFile +="00000";
-    dataFile += ss.str();
+    int n_zero = 6;
+    std::string _str = ss.str();
+    std::string index_str = std::string(n_zero - _str.length(), '0') + _str;
+    dataFile += index_str;
     dataFile +=".bin";
 
     std::cout << "<<<<<<<<<<<" <<std::endl;
@@ -159,7 +188,11 @@ int main(int argc, const char **argv)
     checkCudaErrors(cudaFree(points_data));
 
     std::cout<<"Bndbox objs: "<< nms_pred.size()<<std::endl;
+    std::string save_file_name = Save_Dir + index_str + ".txt";
+    SaveBoxPred(nms_pred, save_file_name);
+
     nms_pred.clear();
+
     std::cout << ">>>>>>>>>>>" <<std::endl;
   }
 
