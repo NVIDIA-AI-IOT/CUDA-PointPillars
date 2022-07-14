@@ -1,3 +1,6 @@
 [submodule "OpenPCDet"]
 	path = OpenPCDet
 	url = https://github.com/open-mmlab/OpenPCDet.git
+[submodule "eval/kitti-object-eval-python"]
+	path = eval/kitti-object-eval-python
+	url = https://github.com/traveller59/kitti-object-eval-python.git
