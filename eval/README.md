@@ -3,7 +3,7 @@
 ## Dataset
 
 Download the data (calib, image\_2, label\_2, velodyne) from [Kitti Object Detection Dataset](http://www.cvlibs.net/datasets/kitti/eval_object.php?obj_benchmark=3d) and place it in your data folder at `kitti/object`.
-Note that in order to get the similar mAP compariable to OpenPCDet, we shall use pruned pointcloud in camera FOV. Then
+Note that in order to get the similar mAP compariable to OpenPCDet, we shall use pruned pointcloud in camera FOV.
 
 The folder structure is as following:
 
