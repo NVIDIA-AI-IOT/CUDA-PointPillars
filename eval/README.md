@@ -66,7 +66,7 @@ kitti
 
 ```
 (kitti_eval)$ python setup.py bdist_wheel
-(kitti_eval)$ cd dist/ && pip install *.
+(kitti_eval)$ cd dist/ && pip install *.whl
 ```
 
 ### Install second-1.5.1
