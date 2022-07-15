@@ -121,7 +121,7 @@ def main():
       dummy_input['voxels'] = dummy_voxels
       dummy_input['voxel_num_points'] = dummy_voxel_num
       dummy_input['voxel_coords'] = dummy_voxel_idxs
-      dummy_input['batch_size'] = 1
+      dummy_input['batch_size'] = torch.tensor(1)
 
       torch.onnx.export(model,       # model being run
           dummy_input,               # model input (or a tuple for multiple inputs)
