@@ -69,7 +69,6 @@ include_directories(
 
 link_directories(
 	${TENSORRT_LIBRARY_DIRS}
-	/usr/lib/aarch64-linux-gnu
   /usr/aarch64-linux-gnu/lib/
 )
 
