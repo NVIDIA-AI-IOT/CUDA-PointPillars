@@ -29,12 +29,12 @@ namespace nvinfer1
 namespace plugin
 {
 
-class PillarScatterPlugin : public nvinfer1::IPluginV2DynamicExt
+class PPScatterPlugin : public nvinfer1::IPluginV2DynamicExt
 {
 public:
-    PillarScatterPlugin() = delete;
-    PillarScatterPlugin(const void* data, size_t length);
-    PillarScatterPlugin(size_t h, size_t w);
+    PPScatterPlugin() = delete;
+    PPScatterPlugin(const void* data, size_t length);
+    PPScatterPlugin(size_t h, size_t w);
     // IPluginV2DynamicExt Methods
     nvinfer1::IPluginV2DynamicExt* clone() const noexcept override;
     nvinfer1::DimsExprs getOutputDimensions(int outputIndex, 
@@ -74,10 +74,10 @@ private:
     size_t feature_x_size_;
 };
 
-class PillarScatterPluginCreator : public nvinfer1::IPluginCreator
+class PPScatterPluginCreator : public nvinfer1::IPluginCreator
 {
 public:
-    PillarScatterPluginCreator();
+    PPScatterPluginCreator();
     const char* getPluginName() const noexcept override;
     const char* getPluginVersion() const noexcept override;
     const nvinfer1::PluginFieldCollection* getFieldNames() noexcept override;

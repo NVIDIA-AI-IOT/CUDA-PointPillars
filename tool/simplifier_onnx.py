@@ -28,7 +28,7 @@ def replace_with_clip(self, inputs, outputs):
     op_attrs = dict()
     op_attrs["dense_shape"] = np.array([496,432])
 
-    return self.layer(name="PillarScatter_0", op="PillarScatterPlugin", inputs=inputs, outputs=outputs, attrs=op_attrs)
+    return self.layer(name="PPScatter_0", op="PPScatterPlugin", inputs=inputs, outputs=outputs, attrs=op_attrs)
 
 def loop_node(graph, current_node, loop_time=0):
   for i in range(loop_time):
