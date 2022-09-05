@@ -27,6 +27,9 @@ To build the pointpillars inference, **TensorRT** with PillarScatter layer and *
 ### Compile && Run
 
 ```shell
+$ sudo apt-get install git-lfs
+$ git lfs install
+$ git clone https://github.com/NVIDIA-AI-IOT/CUDA-PointPillars.git && cd CUDA-PointPillars
 $ mkdir build && cd build
 $ cmake .. && make -j$(nproc)
 $ ./demo
