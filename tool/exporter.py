@@ -113,7 +113,7 @@ def main():
           device='cuda:0')
 
       dummy_voxel_num = torch.zeros(
-          (MAX_VOXELS),
+          (1),
           dtype=torch.int32,
           device='cuda:0')
 

@@ -19,15 +19,15 @@
 #include "pillarScatter.h"
 
 using namespace nvinfer1;
-using nvinfer1::plugin::PillarScatterPlugin;
-using nvinfer1::plugin::PillarScatterPluginCreator;
+using nvinfer1::plugin::PPScatterPlugin;
+using nvinfer1::plugin::PPScatterPluginCreator;
 
 static const char* PLUGIN_VERSION{"1"};
-static const char* PLUGIN_NAME{"PillarScatterPlugin"};
+static const char* PLUGIN_NAME{"PPScatterPlugin"};
 
 // Static class fields initialization
-PluginFieldCollection PillarScatterPluginCreator::mFC{};
-std::vector<PluginField> PillarScatterPluginCreator::mPluginAttributes;
+PluginFieldCollection PPScatterPluginCreator::mFC{};
+std::vector<PluginField> PPScatterPluginCreator::mPluginAttributes;
 
 // Helper function for serializing plugin
 template <typename T>
@@ -46,26 +46,26 @@ T readFromBuffer(const char*& buffer)
     return val;
 }
 
-PillarScatterPlugin::PillarScatterPlugin(size_t h, size_t w)
+PPScatterPlugin::PPScatterPlugin(size_t h, size_t w)
   : feature_y_size_(h), feature_x_size_(w)
 {
 }
 
-PillarScatterPlugin::PillarScatterPlugin(const void* data, size_t length)
+PPScatterPlugin::PPScatterPlugin(const void* data, size_t length)
 {
     const char* d = reinterpret_cast<const char*>(data);
     feature_y_size_ = readFromBuffer<size_t>(d);
     feature_x_size_ = readFromBuffer<size_t>(d);
 }
 
-nvinfer1::IPluginV2DynamicExt* PillarScatterPlugin::clone() const noexcept
+nvinfer1::IPluginV2DynamicExt* PPScatterPlugin::clone() const noexcept
 {
-    auto* plugin = new PillarScatterPlugin(feature_y_size_, feature_x_size_);
+    auto* plugin = new PPScatterPlugin(feature_y_size_, feature_x_size_);
     plugin->setPluginNamespace(mNamespace.c_str());
     return plugin;
 }
 
-nvinfer1::DimsExprs PillarScatterPlugin::getOutputDimensions(
+nvinfer1::DimsExprs PPScatterPlugin::getOutputDimensions(
     int outputIndex, const nvinfer1::DimsExprs* inputs, int nbInputs, nvinfer1::IExprBuilder& exprBuilder) noexcept
 {
     assert(outputIndex == 0);
@@ -78,7 +78,7 @@ nvinfer1::DimsExprs PillarScatterPlugin::getOutputDimensions(
     return output;
 }
 
-bool PillarScatterPlugin::supportsFormatCombination(
+bool PPScatterPlugin::supportsFormatCombination(
     int pos, const nvinfer1::PluginTensorDesc* inOut, int nbInputs, int nbOutputs) noexcept
 {
     assert(nbInputs == 3);
@@ -104,18 +104,18 @@ bool PillarScatterPlugin::supportsFormatCombination(
     return false;
 }
 
-void PillarScatterPlugin::configurePlugin(const nvinfer1::DynamicPluginTensorDesc* in, int nbInputs,
+void PPScatterPlugin::configurePlugin(const nvinfer1::DynamicPluginTensorDesc* in, int nbInputs,
     const nvinfer1::DynamicPluginTensorDesc* out, int nbOutputs) noexcept
 {
     return;
 }
 
-size_t PillarScatterPlugin::getWorkspaceSize(const nvinfer1::PluginTensorDesc* inputs, int nbInputs,
+size_t PPScatterPlugin::getWorkspaceSize(const nvinfer1::PluginTensorDesc* inputs, int nbInputs,
     const nvinfer1::PluginTensorDesc* outputs, int nbOutputs) const noexcept
 {
     return 0;
 }
-int PillarScatterPlugin::enqueue(const nvinfer1::PluginTensorDesc* inputDesc,
+int PPScatterPlugin::enqueue(const nvinfer1::PluginTensorDesc* inputDesc,
     const nvinfer1::PluginTensorDesc* outputDesc, const void* const* inputs, void* const* outputs, void* workspace,
     cudaStream_t stream) noexcept
 {
@@ -182,64 +182,64 @@ int PillarScatterPlugin::enqueue(const nvinfer1::PluginTensorDesc* inputDesc,
     return -1;
 }
 
-nvinfer1::DataType PillarScatterPlugin::getOutputDataType(
+nvinfer1::DataType PPScatterPlugin::getOutputDataType(
     int index, const nvinfer1::DataType* inputTypes, int nbInputs) const noexcept
 {
     return inputTypes[0];
 }
 
-const char* PillarScatterPlugin::getPluginType() const noexcept
+const char* PPScatterPlugin::getPluginType() const noexcept
 {
     return PLUGIN_NAME;
 }
 
-const char* PillarScatterPlugin::getPluginVersion() const noexcept
+const char* PPScatterPlugin::getPluginVersion() const noexcept
 {
     return PLUGIN_VERSION;
 }
 
-int PillarScatterPlugin::getNbOutputs() const noexcept
+int PPScatterPlugin::getNbOutputs() const noexcept
 {
     return 1;
 }
 
-int PillarScatterPlugin::initialize() noexcept
+int PPScatterPlugin::initialize() noexcept
 {
     return 0;
 }
 
-void PillarScatterPlugin::terminate() noexcept
+void PPScatterPlugin::terminate() noexcept
 {
 }
 
-size_t PillarScatterPlugin::getSerializationSize() const noexcept
+size_t PPScatterPlugin::getSerializationSize() const noexcept
 {
     return 3 * sizeof(size_t);
 }
 
-void PillarScatterPlugin::serialize(void* buffer) const noexcept
+void PPScatterPlugin::serialize(void* buffer) const noexcept
 {
     char* d = reinterpret_cast<char*>(buffer);
     writeToBuffer<size_t>(d, feature_y_size_);
     writeToBuffer<size_t>(d, feature_x_size_);
 }
 
-void PillarScatterPlugin::destroy() noexcept
+void PPScatterPlugin::destroy() noexcept
 {
     delete this;
 }
 
-void PillarScatterPlugin::setPluginNamespace(const char* libNamespace) noexcept
+void PPScatterPlugin::setPluginNamespace(const char* libNamespace) noexcept
 {
     mNamespace = libNamespace;
 }
 
-const char* PillarScatterPlugin::getPluginNamespace() const noexcept
+const char* PPScatterPlugin::getPluginNamespace() const noexcept
 {
     return mNamespace.c_str();
 }
 
-PillarScatterPluginCreator::PillarScatterPluginCreator()
+PPScatterPluginCreator::PPScatterPluginCreator()
 {
     mPluginAttributes.clear();
     mPluginAttributes.emplace_back(PluginField("dense_shape", nullptr, PluginFieldType::kINT32, 1));
@@ -247,22 +247,22 @@ PillarScatterPluginCreator::PillarScatterPluginCreator()
     mFC.fields = mPluginAttributes.data();
 }
 
-const char* PillarScatterPluginCreator::getPluginName() const noexcept
+const char* PPScatterPluginCreator::getPluginName() const noexcept
 {
     return PLUGIN_NAME;
 }
 
-const char* PillarScatterPluginCreator::getPluginVersion() const noexcept
+const char* PPScatterPluginCreator::getPluginVersion() const noexcept
 {
     return PLUGIN_VERSION;
 }
 
-const PluginFieldCollection* PillarScatterPluginCreator::getFieldNames() noexcept
+const PluginFieldCollection* PPScatterPluginCreator::getFieldNames() noexcept
 {
     return &mFC;
 }
 
-IPluginV2* PillarScatterPluginCreator::createPlugin(const char* name, const PluginFieldCollection* fc) noexcept
+IPluginV2* PPScatterPluginCreator::createPlugin(const char* name, const PluginFieldCollection* fc) noexcept
 {
     const PluginField* fields = fc->fields;
     int nbFields = fc->nbFields;
@@ -278,29 +278,29 @@ IPluginV2* PillarScatterPluginCreator::createPlugin(const char* name, const Plug
             target_w = ts[1];
         }
     }
-    auto* plugin = new PillarScatterPlugin(
+    auto* plugin = new PPScatterPlugin(
         target_h,
         target_w
     );
     return plugin;
 }
 
-IPluginV2* PillarScatterPluginCreator::deserializePlugin(
+IPluginV2* PPScatterPluginCreator::deserializePlugin(
     const char* name, const void* serialData, size_t serialLength) noexcept
 {
     // This object will be deleted when the network is destroyed,
-    auto* plugin = new PillarScatterPlugin(serialData, serialLength);
+    auto* plugin = new PPScatterPlugin(serialData, serialLength);
     return plugin;
 }
 
-void PillarScatterPluginCreator::setPluginNamespace(const char* libNamespace) noexcept
+void PPScatterPluginCreator::setPluginNamespace(const char* libNamespace) noexcept
 {
     mNamespace = libNamespace;
 }
 
-const char* PillarScatterPluginCreator::getPluginNamespace() const noexcept
+const char* PPScatterPluginCreator::getPluginNamespace() const noexcept
 {
     return mNamespace.c_str();
 }
 
-REGISTER_TENSORRT_PLUGIN(PillarScatterPluginCreator);
+REGISTER_TENSORRT_PLUGIN(PPScatterPluginCreator);
