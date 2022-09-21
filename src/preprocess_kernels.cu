@@ -146,6 +146,8 @@ __global__ void generateBaseFeatures_kernel(unsigned int *mask, float *voxels,
   unsigned int current_pillarId = 0;
   current_pillarId = atomicAdd(pillar_num, 1);
 
+  if( current_pillarId >= MAX_VOXELS ) return;
+  
   voxel_num[current_pillarId] = count;
 
   uint4 idx = {0, 0, voxel_idy, voxel_idx};
