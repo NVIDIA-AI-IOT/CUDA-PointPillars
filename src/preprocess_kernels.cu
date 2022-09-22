@@ -196,10 +196,10 @@ __global__ void generateFeatures_kernel(float* voxel_features,
     int pillar_idx = blockIdx.x * WARPS_PER_BLOCK + threadIdx.x/WARP_SIZE;
     int point_idx = threadIdx.x % WARP_SIZE;
 
-    int pillar_idx_inBlock = threadIdx.x/32;
+    int pillar_idx_inBlock = threadIdx.x/WARP_SIZE;
     unsigned int num_pillars = params[0];
 
-    if (pillar_idx >= num_pillars) return;
+    if (pillar_idx >= num_pillars || pillar_idx >= MAX_VOXELS) return;
 
     __shared__ float4 pillarSM[WARPS_PER_BLOCK][WARP_SIZE];
     __shared__ float4 pillarSumSM[WARPS_PER_BLOCK];
