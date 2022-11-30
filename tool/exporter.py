@@ -101,9 +101,32 @@ def main():
     with torch.no_grad():
 
       MAX_VOXELS = 10000
+      NUMBER_OF_CLASSES = len(cfg.CLASS_NAMES)
+
+      MAX_POINTS_PER_VOXEL = None
+
+      DATA_PROCESSOR = cfg.DATA_CONFIG.DATA_PROCESSOR
+      POINT_CLOUD_RANGE = cfg.DATA_CONFIG.POINT_CLOUD_RANGE
+      for i in DATA_PROCESSOR:
+        if i['NAME'] == "transform_points_to_voxels":
+            MAX_POINTS_PER_VOXEL = i['MAX_POINTS_PER_VOXEL']
+            VOXEL_SIZES = i['VOXEL_SIZE']
+            break
+
+
+      if MAX_POINTS_PER_VOXEL == None:
+        logger.info('Could Not Parse Config... Exiting')
+        import sys
+        sys.exit()
+
+      VOXEL_SIZE_X = abs(POINT_CLOUD_RANGE[0] - POINT_CLOUD_RANGE[3]) / VOXEL_SIZES[0]
+      VOXEL_SIZE_Y = abs(POINT_CLOUD_RANGE[1] - POINT_CLOUD_RANGE[4]) / VOXEL_SIZES[1]
+    
+      FEATURE_SIZE_X = VOXEL_SIZE_X / 2 #Is this number of bins? 
+      FEATURE_SIZE_Y = VOXEL_SIZE_Y / 2
 
       dummy_voxels = torch.zeros(
-          (MAX_VOXELS, 32, 4),
+          (MAX_VOXELS, MAX_POINTS_PER_VOXEL, 4),
           dtype=torch.float32,
           device='cuda:0')
 
@@ -121,7 +144,7 @@ def main():
       dummy_input['voxels'] = dummy_voxels
       dummy_input['voxel_num_points'] = dummy_voxel_num
       dummy_input['voxel_coords'] = dummy_voxel_idxs
-      dummy_input['batch_size'] = 1
+      dummy_input['batch_size'] = torch.tensor(1)
 
       torch.onnx.export(model,       # model being run
           dummy_input,               # model input (or a tuple for multiple inputs)
@@ -135,12 +158,12 @@ def main():
           )
 
       onnx_raw = onnx.load("./pointpillar_raw.onnx")  # load onnx model
-      onnx_trim_post = simplify_postprocess(onnx_raw)
+      onnx_trim_post = simplify_postprocess(onnx_raw, FEATURE_SIZE_X, FEATURE_SIZE_Y, NUMBER_OF_CLASSES)
       
       onnx_simp, check = simplify(onnx_trim_post)
       assert check, "Simplified ONNX model could not be validated"
 
-      onnx_final = simplify_preprocess(onnx_simp)
+      onnx_final = simplify_preprocess(onnx_simp, VOXEL_SIZE_X, VOXEL_SIZE_Y, MAX_POINTS_PER_VOXEL)
       onnx.save(onnx_final, "pointpillar.onnx")
       print('finished exporting onnx')
 

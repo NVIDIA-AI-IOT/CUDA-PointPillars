@@ -18,7 +18,7 @@ import numpy as np
 import onnx_graphsurgeon as gs
 
 @gs.Graph.register()
-def replace_with_clip(self, inputs, outputs):
+def replace_with_clip(self, inputs, outputs, voxel_array):
     for inp in inputs:
         inp.outputs.clear()
 
@@ -26,7 +26,7 @@ def replace_with_clip(self, inputs, outputs):
         out.inputs.clear()
 
     op_attrs = dict()
-    op_attrs["dense_shape"] = np.array([496,432])
+    op_attrs["dense_shape"] = voxel_array
 
     return self.layer(name="PPScatter_0", op="PPScatterPlugin", inputs=inputs, outputs=outputs, attrs=op_attrs)
 
@@ -36,13 +36,13 @@ def loop_node(graph, current_node, loop_time=0):
     current_node = next_node
   return next_node
 
-def simplify_postprocess(onnx_model):
+def simplify_postprocess(onnx_model, FEATURE_SIZE_X, FEATURE_SIZE_Y, NUMBER_OF_CLASSES):
   print("Use onnx_graphsurgeon to adjust postprocessing part in the onnx...")
   graph = gs.import_onnx(onnx_model)
 
-  cls_preds = gs.Variable(name="cls_preds", dtype=np.float32, shape=(1, 248, 216, 18))
-  box_preds = gs.Variable(name="box_preds", dtype=np.float32, shape=(1, 248, 216, 42))
-  dir_cls_preds = gs.Variable(name="dir_cls_preds", dtype=np.float32, shape=(1, 248, 216, 12))
+  cls_preds = gs.Variable(name="cls_preds", dtype=np.float32, shape=(1, int(FEATURE_SIZE_Y), int(FEATURE_SIZE_X), 2*NUMBER_OF_CLASSES*NUMBER_OF_CLASSES))
+  box_preds = gs.Variable(name="box_preds", dtype=np.float32, shape=(1, int(FEATURE_SIZE_Y), int(FEATURE_SIZE_X), 14*NUMBER_OF_CLASSES))
+  dir_cls_preds = gs.Variable(name="dir_cls_preds", dtype=np.float32, shape=(1, int(FEATURE_SIZE_Y), int(FEATURE_SIZE_X), 4*NUMBER_OF_CLASSES))
 
   tmap = graph.tensors()
   new_inputs = [tmap["voxels"], tmap["voxel_idxs"], tmap["voxel_num"]]
@@ -73,18 +73,20 @@ def simplify_postprocess(onnx_model):
   return gs.export_onnx(graph)
 
 
-def simplify_preprocess(onnx_model):
+def simplify_preprocess(onnx_model, VOXEL_SIZE_Y, VOXEL_SIZE_X, MAX_POINTS_PER_VOXEL):
   print("Use onnx_graphsurgeon to modify onnx...")
   graph = gs.import_onnx(onnx_model)
 
   tmap = graph.tensors()
   MAX_VOXELS = tmap["voxels"].shape[0]
 
+  VOXEL_ARRAY = np.array([int(VOXEL_SIZE_Y),int(VOXEL_SIZE_X)])
+
   # voxels: [V, P, C']
   # V is the maximum number of voxels per frame
   # P is the maximum number of points per voxel
   # C' is the number of channels(features) per point in voxels.
-  input_new = gs.Variable(name="voxels", dtype=np.float32, shape=(MAX_VOXELS, 32, 10))
+  input_new = gs.Variable(name="voxels", dtype=np.float32, shape=(MAX_VOXELS, MAX_POINTS_PER_VOXEL, 10))
 
   # voxel_idxs: [V, 4]
   # V is the maximum number of voxels per frame
@@ -113,7 +115,7 @@ def simplify_preprocess(onnx_model):
   graph.inputs.append(Y)
   inputs = [last_node_pillarvfe.outputs[0], X, Y]
   outputs = [first_node_after_pillarscatter.inputs[0]]
-  graph.replace_with_clip(inputs, outputs)
+  graph.replace_with_clip(inputs, outputs, VOXEL_ARRAY)
 
   # Remove the now-dangling subgraph.
   graph.cleanup().toposort()
