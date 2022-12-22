@@ -73,14 +73,14 @@ def simplify_postprocess(onnx_model, FEATURE_SIZE_X, FEATURE_SIZE_Y, NUMBER_OF_C
   return gs.export_onnx(graph)
 
 
-def simplify_preprocess(onnx_model, VOXEL_SIZE_Y, VOXEL_SIZE_X, MAX_POINTS_PER_VOXEL):
+def simplify_preprocess(onnx_model, VOXEL_SIZE_X, VOXEL_SIZE_Y, MAX_POINTS_PER_VOXEL):
   print("Use onnx_graphsurgeon to modify onnx...")
   graph = gs.import_onnx(onnx_model)
 
   tmap = graph.tensors()
   MAX_VOXELS = tmap["voxels"].shape[0]
 
-  VOXEL_ARRAY = np.array([int(VOXEL_SIZE_Y),int(VOXEL_SIZE_X)])
+  VOXEL_ARRAY = np.array([int(VOXEL_SIZE_X),int(VOXEL_SIZE_Y)])
 
   # voxels: [V, P, C']
   # V is the maximum number of voxels per frame
