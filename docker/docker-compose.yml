@@ -1,0 +1,16 @@
+# email: rbelshaw@sagarobotics.com
+# Need to docker login
+version: '2.4'
+services:
+    open_pcdet_export:
+        image: open_pcdet:latest
+        build: .
+        user: ${_UID}:${_UID}
+        restart: on-failure:2
+        entrypoint: /bin/bash ./entrypoint.sh
+        volumes:
+            - ./entrypoint.sh:/entrypoint.sh
+            - ../tool:/exporter
+            - ./${_CKPT}:/checkpoint.pth
+            - ../tool/cfgs/dataset_configs/kitti_dataset.yaml:/exporter/dataset.yaml
+            - ./${_CONFIG}:/pointpillar.yaml
