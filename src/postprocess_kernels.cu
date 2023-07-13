@@ -135,6 +135,8 @@ cudaError_t postprocess_launch(const float *cls_input,
   dim3 threads (num_anchors);
   dim3 blocks (bev_size);
 
+  bndbox_output[0]=0;
+  
   postprocess_kernal<<<blocks, threads, 0, stream>>>
                 (cls_input,
                  box_input,
