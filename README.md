@@ -66,4 +66,5 @@ Set Jetson to power mode with "sudo nvpmodel -m 0 && sudo jetson_clocks"
 
 ## References
 
+- [Detecting Objects in Point Clouds with NVIDIA CUDA-Pointpillars](https://developer.nvidia.com/blog/detecting-objects-in-point-clouds-with-cuda-pointpillars/)
 - [PointPillars: Fast Encoders for Object Detection from Point Clouds](https://arxiv.org/abs/1812.05784)
