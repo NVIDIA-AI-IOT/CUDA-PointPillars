@@ -21,7 +21,6 @@
 
 #include "cuda_runtime.h"
 
-#include "./params.h"
 #include "./pointpillar.h"
 
 #define checkCudaErrors(status)                                   \
@@ -134,8 +133,6 @@ int main(int argc, const char **argv)
   checkCudaErrors(cudaEventCreate(&start));
   checkCudaErrors(cudaEventCreate(&stop));
   checkCudaErrors(cudaStreamCreate(&stream));
-
-  Params params_;
 
   std::vector<Bndbox> nms_pred;
   nms_pred.reserve(100);
