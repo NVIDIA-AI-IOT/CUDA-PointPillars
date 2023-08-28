@@ -118,10 +118,16 @@ def main():
           device='cuda:0')
 
       dummy_input = dict()
-      dummy_input['voxels'] = dummy_voxels
-      dummy_input['voxel_num_points'] = dummy_voxel_num
-      dummy_input['voxel_coords'] = dummy_voxel_idxs
-      dummy_input['batch_size'] = 1
+      dummy_input['batch_dict'] = { # to solve TypeError: PointPillar.forward() missing 1 required positional argument: 'batch_dict'
+          'voxels': dummy_voxels,
+          'voxel_num_points': dummy_voxel_num,
+          'voxel_coords': dummy_voxel_idxs,
+          'batch_size': 1
+      } 
+      # dummy_input['voxels'] = dummy_voxels
+      # dummy_input['voxel_num_points'] = dummy_voxel_num
+      # dummy_input['voxel_coords'] = dummy_voxel_idxs
+      # dummy_input['batch_size'] = 1
 
       torch.onnx.export(model,       # model being run
           dummy_input,               # model input (or a tuple for multiple inputs)
