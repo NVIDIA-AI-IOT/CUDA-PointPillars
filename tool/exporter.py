@@ -122,7 +122,7 @@ def main():
           'voxels': dummy_voxels,
           'voxel_num_points': dummy_voxel_num,
           'voxel_coords': dummy_voxel_idxs,
-          'batch_size': 1
+          'batch_size': 2
       } 
       # dummy_input['voxels'] = dummy_voxels
       # dummy_input['voxel_num_points'] = dummy_voxel_num
