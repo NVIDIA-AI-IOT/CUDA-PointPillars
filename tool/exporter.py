@@ -140,14 +140,14 @@ def main():
           output_names = ['cls_preds', 'box_preds', 'dir_cls_preds'], # the model's output names
           )
 
-      onnx_raw = onnx.load("./pointpillar_raw.onnx")  # load onnx model
-      onnx_trim_post = simplify_postprocess(onnx_raw)
+      # onnx_raw = onnx.load("./pointpillar_raw.onnx")  # load onnx model
+      # onnx_trim_post = simplify_postprocess(onnx_raw)
       
-      onnx_simp, check = simplify(onnx_trim_post)
-      assert check, "Simplified ONNX model could not be validated"
+      # onnx_simp, check = simplify(onnx_trim_post)
+      # assert check, "Simplified ONNX model could not be validated"
 
-      onnx_final = simplify_preprocess(onnx_simp)
-      onnx.save(onnx_final, "pointpillar.onnx")
+      # onnx_final = simplify_preprocess(onnx_simp)
+      # onnx.save(onnx_final, "pointpillar.onnx")
       print('finished exporting onnx')
 
     logger.info('[PASS] ONNX EXPORTED.')
