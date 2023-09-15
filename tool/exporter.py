@@ -100,7 +100,7 @@ def main():
     np.set_printoptions(threshold=np.inf)
     with torch.no_grad():
 
-      MAX_VOXELS = 10000
+      MAX_VOXELS = 40000
 
       dummy_voxels = torch.zeros(
           (MAX_VOXELS, 32, 4),
