@@ -1,6 +1,6 @@
 # PointPillars Inference with TensorRT
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://drive.google.com/file/d/1D-wrIbl3O9cgB_X0jkPgpp2ctCLfr0Uj/view?usp=sharing)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1BzJ23ZjuuozlXp_FsCnTKRLrCsNp_hl2?usp=sharing)
 
 This repository contains sources and model for [pointpillars](https://arxiv.org/abs/1812.05784) inference using TensorRT.
 The model is created with [OpenPCDet](https://github.com/open-mmlab/OpenPCDet) and modified with onnx_graphsurgeon.
