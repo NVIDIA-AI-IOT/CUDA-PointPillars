@@ -81,9 +81,7 @@ __global__ void pillarScatterFloatkernel(const float *pillar_features_data,
     }
 }
 
-int pillarScatterHalfKernelLaunch(int max_pillar_num,
-                                  int num_features,
-                                  const half *pillar_features_data,
+int pillarScatterHalfKernelLaunch(const half *pillar_features_data,
                                   const unsigned int *coords_data,
                                   const unsigned int *params_data,
                                   unsigned int featureX, unsigned int featureY,
@@ -103,9 +101,7 @@ int pillarScatterHalfKernelLaunch(int max_pillar_num,
     return 0;
 }
 
-int pillarScatterFloatKernelLaunch(int max_pillar_num,
-                                   int num_features,
-                                   const float *pillar_features_data,
+int pillarScatterFloatKernelLaunch(const float *pillar_features_data,
                                    const unsigned int *coords_data,
                                    const unsigned int *params_data,
                                    unsigned int featureX, unsigned int featureY,

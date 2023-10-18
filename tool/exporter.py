@@ -113,7 +113,7 @@ def main():
           device='cuda:0')
 
       dummy_voxel_num = torch.zeros(
-          (1),
+          (1,),
           dtype=torch.int32,
           device='cuda:0')
 
@@ -146,5 +146,19 @@ def main():
 
     logger.info('[PASS] ONNX EXPORTED.')
 
+import onnx_graphsurgeon as gs
+
+def test():
+    model = onnx.load("pointpillar.onnx")
+    graph = gs.import_onnx(model)
+    rm_node = [node for node in graph.nodes if node.op == "ReduceMax"][-1]
+
+    graph.inputs = [graph.inputs[0]]
+    graph.outputs = [rm_node.outputs[0]]
+
+    graph.cleanup().toposort()
+    onnx.save(gs.export_onnx(graph), "pointnet.onnx")
+
 if __name__ == '__main__':
     main()
+    test()

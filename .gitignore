@@ -1,0 +1,8 @@
+build
+eval
+data
+backup
+workspace
+model
+.idea
+**/__pycache__

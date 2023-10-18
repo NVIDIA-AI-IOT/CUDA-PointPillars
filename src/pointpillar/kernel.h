@@ -81,8 +81,6 @@ cudaError_t generateFeatures_launch(float* voxel_features,
     cudaStream_t stream = 0);
 
 int pillarScatterHalfKernelLaunch(
-  int max_pillar_num,
-  int num_features,
   const half *pillar_features_data,
   const unsigned int *coords_data,
   const unsigned int *params_data,
@@ -91,8 +89,6 @@ int pillarScatterHalfKernelLaunch(
   cudaStream_t stream);
 
 int pillarScatterFloatKernelLaunch(
-  int max_pillar_num,
-  int num_features,
   const float *pillar_features_data,
   const unsigned int *coords_data,
   const unsigned int *params_data,

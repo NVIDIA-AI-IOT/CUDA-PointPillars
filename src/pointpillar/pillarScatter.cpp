@@ -121,7 +121,6 @@ int PPScatterPlugin::enqueue(const nvinfer1::PluginTensorDesc* inputDesc,
 {
     try
     {
-        int maxPillarNum = inputDesc[0].dims.d[0];
         int numFeatures = inputDesc[0].dims.d[1];
         
         nvinfer1::DataType inputType = inputDesc[0].type;
@@ -139,8 +138,6 @@ int PPScatterPlugin::enqueue(const nvinfer1::PluginTensorDesc* inputDesc,
             auto spatial_feature_data = static_cast<half *>(outputs[0]);
             cudaMemsetAsync(spatial_feature_data, 0, numFeatures*featureY*featureX * sizeof(half), stream);
             status = pillarScatterHalfKernelLaunch(
-                maxPillarNum,
-                numFeatures,
                 pillar_features_data,
                 coords_data,
                 params_data,
@@ -157,8 +154,6 @@ int PPScatterPlugin::enqueue(const nvinfer1::PluginTensorDesc* inputDesc,
             auto spatial_feature_data = static_cast<float *>(outputs[0]);
             cudaMemsetAsync(spatial_feature_data, 0, numFeatures*featureY*featureX * sizeof(float), stream);
             status = pillarScatterFloatKernelLaunch(
-                maxPillarNum,
-                numFeatures,
                 pillar_features_data,
                 coords_data,
                 params_data,

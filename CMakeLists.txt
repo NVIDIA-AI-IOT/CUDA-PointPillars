@@ -14,73 +14,72 @@
 # limitations under the License.
 
 cmake_minimum_required(VERSION 2.8.7)
-project(demo)
+project(pointpillar)
+set(CMAKE_BUILD_PYTHON $ENV{USE_Python})
+set(CMAKE_BUILD_TYPE "Release")
+# set(CMAKE_BUILD_TYPE "Debug")
+set(arch ${CMAKE_HOST_SYSTEM_PROCESSOR})
+
 find_package(CUDA REQUIRED)
 
-if(${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL  "aarch64")
-  set(CMAKE_C_COMPILER /usr/bin/aarch64-linux-gnu-gcc)
-  set(CMAKE_CXX_COMPILER /usr/bin/aarch64-linux-gnu-g++)
-  set(CUDA_INSTALL_TARGET_DIR targets/aarch64-linux)
-elseif(${CMAKE_HOST_SYSTEM_PROCESSOR} STREQUAL "x86_64")
-  set(CMAKE_C_COMPILER /usr/bin/gcc)
-  set(CMAKE_CXX_COMPILER /usr/bin/g++)
-  set(CUDA_INSTALL_TARGET_DIR targets/x86_64-linux)
-endif()
+set(CMAKE_CXX_FLAGS_RELEASE "-std=c++14 -Wextra -Wall -Wno-missing-field-initializers -Wno-deprecated-declarations -O3")
+set(CMAKE_CXX_FLAGS_DEBUG   "-std=c++14 -O0 -g")
 
-set(CUDA_TOOLKIT_ROOT_DIR /usr/local/cuda)
-set(CUDA_INCLUDE_DIRS ${CUDA_TOOLKIT_ROOT_DIR}/${CUDA_INSTALL_TARGET_DIR}/include)
+set(CUDA_NVCC_FLAGS_RELEASE "-Werror=all-warnings -Xcompiler -std=c++14,-Wextra,-Wall,-Wno-deprecated-declarations,-O3")
+set(CUDA_NVCC_FLAGS_DEBUG   "-std=c++14 -O0 -g")
 
-set(CMAKE_BUILD_TYPE "Release")
-set(CMAKE_CXX_FLAGS_RELEASE "-Wno-deprecated-declarations -O2")
-add_compile_options(-W)
-add_compile_options(-std=c++11)
-
-set( SMS 30 32 35 37 50 52 53 60 61 62 70 72 75 87)
-foreach(sm ${SMS})
-	set(GENCODE ${GENCODE} -gencode arch=compute_${sm},code=sm_${sm})
-endforeach()
-set(HIGHEST_SM 87)
-set(GENCODE ${GENCODE} -gencode arch=compute_${HIGHEST_SM},code=compute_${HIGHEST_SM})
-
-set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}
-    -ccbin ${CMAKE_CXX_COMPILER}
-    -Xcompiler -DWIN_INTERFACE_CUSTOM
-    -Xcompiler -I/usr/aarch64-linux-gnu/include/
-    -Xlinker -lsocket
-    -Xlinker -rpath=/usr/lib/aarch64-linux-gnu/
-    -Xlinker -rpath=/usr/aarch64-linux-gnu/lib/
-    -Xlinker -L/usr/lib/aarch64-linux-gnu/
-    -Xlinker -L/usr/aarch64-linux-gnu/lib/
+set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} 
+    -gencode arch=compute_$ENV{CUDASM},code=compute_$ENV{CUDASM}
 )
 
-if(${CMAKE_BUILD_TYPE} STREQUAL "Debug")
-  message("Using Debug Mode")
-  set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS} -g -G --ptxas-options=-v)
-endif()
-
-set(TENSORRT_INCLUDE_DIRS /usr/include/aarch64-linux-gnu/)
-set(TENSORRT_LIBRARY_DIRS /usr/lib/aarch64-linux-gnu/)
-
 include_directories(
-    ${CUDA_INCLUDE_DIRS}
-    ${TENSORRT_INCLUDE_DIRS}
-    include
+    $ENV{CUDA_Inc}
+    $ENV{TensorRT_Inc}
+	../libraries/cuOSD/src
+    src/common
+	src/pointpillar
 )
 
 link_directories(
-	${TENSORRT_LIBRARY_DIRS}
-	/usr/lib/aarch64-linux-gnu
-  /usr/aarch64-linux-gnu/lib/
+    $ENV{CUDA_Lib}
+    $ENV{TensorRT_Lib}
+    build
 )
 
-file(GLOB_RECURSE SOURCE_FILES
-    src/*.cu
-    src/*.cpp
+file(GLOB_RECURSE CORE_FILES 
+    src/pointpillar/*.cu 
+    src/pointpillar/*.cpp
+    src/common/tensor.cu
+    src/common/tensorrt.cpp
 )
 
-cuda_add_executable(${PROJECT_NAME} main.cpp ${SOURCE_FILES})
-
-target_link_libraries(${PROJECT_NAME}
-    libnvinfer.so
-    libnvonnxparser.so
+file(GLOB_RECURSE VISUALIZE_FILES 
+  ../libraries/cuOSD/src/*.cpp
+  ../libraries/cuOSD/src/*.cu
+  src/common/visualize.cu
 )
+
+####################### libpointpillar_core.so ##########################
+cuda_add_library(pointpillar_core SHARED 
+  	${CORE_FILES}
+)
+
+target_link_libraries(pointpillar_core
+	libnvinfer.so
+	libnvonnxparser.so
+)
+#######################################################################
+
+
+####################### pointpillar program #############################
+cuda_add_executable(pointpillar 
+	src/main.cpp
+	${VISUALIZE_FILES}
+)
+
+target_link_libraries(pointpillar
+	pointpillar_core
+	libnvinfer.so
+	libnvonnxparser.so
+)
+#######################################################################
