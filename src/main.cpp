@@ -22,20 +22,7 @@
 #include "cuda_runtime.h"
 
 #include "./params.h"
-#include "./pointpillar.h"
-
-#define checkCudaErrors(status)                                   \
-{                                                                 \
-  if (status != 0)                                                \
-  {                                                               \
-    std::cout << "Cuda failure: " << cudaGetErrorString(status)   \
-              << " at line " << __LINE__                          \
-              << " in file " << __FILE__                          \
-              << " error status: " << status                      \
-              << std::endl;                                       \
-              abort();                                            \
-    }                                                             \
-}
+#include "pointpillar.hpp"
 
 std::string Data_File = "../data/";
 std::string Save_Dir = "../eval/kitti/object/pred_velo/";
@@ -131,9 +118,9 @@ int main(int argc, const char **argv)
   float elapsedTime = 0.0f;
   cudaStream_t stream = NULL;
 
-  checkCudaErrors(cudaEventCreate(&start));
-  checkCudaErrors(cudaEventCreate(&stop));
-  checkCudaErrors(cudaStreamCreate(&stream));
+  checkRuntime(cudaEventCreate(&start));
+  checkRuntime(cudaEventCreate(&stop));
+  checkRuntime(cudaStreamCreate(&stream));
 
   Params params_;
 
@@ -173,9 +160,9 @@ int main(int argc, const char **argv)
 
     float *points_data = nullptr;
     unsigned int points_data_size = points_size * 4 * sizeof(float);
-    checkCudaErrors(cudaMallocManaged((void **)&points_data, points_data_size));
-    checkCudaErrors(cudaMemcpy(points_data, points, points_data_size, cudaMemcpyDefault));
-    checkCudaErrors(cudaDeviceSynchronize());
+    checkRuntime(cudaMallocManaged((void **)&points_data, points_data_size));
+    checkRuntime(cudaMemcpy(points_data, points, points_data_size, cudaMemcpyDefault));
+    checkRuntime(cudaDeviceSynchronize());
 
     cudaEventRecord(start, stream);
 
@@ -185,7 +172,7 @@ int main(int argc, const char **argv)
     cudaEventElapsedTime(&elapsedTime, start, stop);
     std::cout<<"TIME: pointpillar: "<< elapsedTime <<" ms." <<std::endl;
 
-    checkCudaErrors(cudaFree(points_data));
+    checkRuntime(cudaFree(points_data));
 
     std::cout<<"Bndbox objs: "<< nms_pred.size()<<std::endl;
     std::string save_file_name = Save_Dir + index_str + ".txt";
@@ -196,9 +183,9 @@ int main(int argc, const char **argv)
     std::cout << ">>>>>>>>>>>" <<std::endl;
   }
 
-  checkCudaErrors(cudaEventDestroy(start));
-  checkCudaErrors(cudaEventDestroy(stop));
-  checkCudaErrors(cudaStreamDestroy(stream));
+  checkRuntime(cudaEventDestroy(start));
+  checkRuntime(cudaEventDestroy(stop));
+  checkRuntime(cudaStreamDestroy(stream));
 
   return 0;
 }

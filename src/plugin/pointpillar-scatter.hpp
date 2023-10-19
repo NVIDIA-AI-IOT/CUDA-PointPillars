@@ -15,14 +15,13 @@
  * limitations under the License.
  */
 
-#ifndef _PILLAR_SCATTER_H_
-#define _PILLAR_SCATTER_H_
+#ifndef _POINTPILLAR_SCATTER_H_
+#define _POINTPILLAR_SCATTER_H_
 
 #include <vector>
 #include <string>
 #include <cuda_runtime_api.h>
 #include "NvInferPlugin.h"
-#include "kernel.h"
 
 namespace nvinfer1
 {
@@ -95,4 +94,4 @@ private:
 } // namespace plugin
 } // namespace nvinfer1
 
-#endif
+#endif _POINTPILLAR_SCATTER_H_

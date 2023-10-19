@@ -15,9 +15,22 @@
  * limitations under the License.
  */
 
-#include "kernel.h"
+#include <cuda_fp16.h>
+#include "lidar-voxelization.hpp"
 
-__global__ void generateVoxels_random_kernel(float *points, size_t points_size,
+#include "common/check.hpp"
+#include "common/launch.cuh"
+
+
+namespace pointpillar {
+namespace lidar {
+
+const int POINTS_PER_VOXEL = 32;      // depends on "params.h"
+const int WARP_SIZE = 32;             // one warp(32 threads) for one pillar
+const int WARPS_PER_BLOCK = 4;        // four warp for one block
+const int FEATURES_SIZE = 10;         // features maps number depands on "params.h"
+
+static __global__ void generateVoxels_random_kernel(const float *points, size_t points_size,
         float min_x_range, float max_x_range,
         float min_y_range, float max_y_range,
         float min_z_range, float max_z_range,
@@ -49,7 +62,7 @@ __global__ void generateVoxels_random_kernel(float *points, size_t points_size,
   atomicExch(address+3, point.w);
 }
 
-cudaError_t generateVoxels_random_launch(float *points, size_t points_size,
+cudaError_t generateVoxels_random_launch(const float *points, size_t points_size,
         float min_x_range, float max_x_range,
         float min_y_range, float max_y_range,
         float min_z_range, float max_z_range,
@@ -58,9 +71,8 @@ cudaError_t generateVoxels_random_launch(float *points, size_t points_size,
         unsigned int *mask, float *voxels,
         cudaStream_t stream)
 {
-  int threadNum = THREADS_FOR_VOXEL;
-  dim3 blocks((points_size+threadNum-1)/threadNum);
-  dim3 threads(threadNum);
+  dim3 blocks((points_size+256-1)/256);
+  dim3 threads(256);
   generateVoxels_random_kernel<<<blocks, threads, 0, stream>>>
     (points, points_size,
         min_x_range, max_x_range,
@@ -73,7 +85,7 @@ cudaError_t generateVoxels_random_launch(float *points, size_t points_size,
   return err;
 }
 
-__global__ void generateVoxelsList_kernel(float *points, size_t points_size,
+static __global__ void generateVoxelsList_kernel(float *points, size_t points_size,
         float min_x_range, float max_x_range,
         float min_y_range, float max_y_range,
         float min_z_range, float max_z_range,
@@ -104,7 +116,7 @@ __global__ void generateVoxelsList_kernel(float *points, size_t points_size,
 
 }
 
-__global__ void generateVoxels_kernel(float *points, size_t points_size,
+static __global__ void generateVoxels_kernel(float *points, size_t points_size,
         int *voxelsList,
         unsigned int *mask, float *voxels)
 {
@@ -125,7 +137,7 @@ __global__ void generateVoxels_kernel(float *points, size_t points_size,
   atomicExch(address+3, point.w);
 }
 
-__global__ void generateBaseFeatures_kernel(unsigned int *mask, float *voxels,
+static __global__ void generateBaseFeatures_kernel(unsigned int *mask, float *voxels,
         int grid_y_size, int grid_x_size,
         unsigned int *pillar_num,
         float *voxel_features,
@@ -185,7 +197,7 @@ cudaError_t generateBaseFeatures_launch(unsigned int *mask, float *voxels,
 }
 
 // 4 channels -> 10 channels
-__global__ void generateFeatures_kernel(float* voxel_features,
+static __global__ void generateFeatures_kernel(float* voxel_features,
     unsigned int* voxel_num, unsigned int* voxel_idxs, unsigned int *params,
     float voxel_x, float voxel_y, float voxel_z,
     float range_min_x, float range_min_y, float range_min_z,
@@ -194,7 +206,7 @@ __global__ void generateFeatures_kernel(float* voxel_features,
     int pillar_idx = blockIdx.x * WARPS_PER_BLOCK + threadIdx.x/WARP_SIZE;
     int point_idx = threadIdx.x % WARP_SIZE;
 
-    int pillar_idx_inBlock = threadIdx.x/32;
+    int pillar_idx_inBlock = threadIdx.x/WARP_SIZE;
     unsigned int num_pillars = params[0];
 
     if (pillar_idx >= num_pillars) return;
@@ -285,16 +297,25 @@ __global__ void generateFeatures_kernel(float* voxel_features,
 
 }
 
+nvtype::Int3 VoxelizationParameter::compute_grid_size(const nvtype::Float3 &max_range, const nvtype::Float3 &min_range,
+                                                      const nvtype::Float3 &voxel_size) {
+  nvtype::Int3 size;
+  size.x = static_cast<int>(std::round((max_range.x - min_range.x) / voxel_size.x));
+  size.y = static_cast<int>(std::round((max_range.y - min_range.y) / voxel_size.y));
+  size.z = static_cast<int>(std::round((max_range.z - min_range.z) / voxel_size.z));
+  return size;
+}
+
 cudaError_t generateFeatures_launch(float* voxel_features,
     unsigned int * voxel_num,
     unsigned int* voxel_idxs,
-    unsigned int *params,
+    unsigned int *params, unsigned int max_voxels,
     float voxel_x, float voxel_y, float voxel_z,
     float range_min_x, float range_min_y, float range_min_z,
     float* features,
     cudaStream_t stream)
 {
-    dim3 blocks( (MAX_VOXELS+WARPS_PER_BLOCK-1)/WARPS_PER_BLOCK);
+    dim3 blocks((max_voxels+WARPS_PER_BLOCK-1)/WARPS_PER_BLOCK);
     dim3 threads(WARPS_PER_BLOCK*WARP_SIZE);
 
     generateFeatures_kernel<<<blocks, threads, 0, stream>>>
@@ -309,3 +330,125 @@ cudaError_t generateFeatures_launch(float* voxel_features,
     cudaError_t err = cudaGetLastError();
     return err;
 }
+
+class VoxelizationImplement : public Voxelization {
+    public:
+        virtual ~VoxelizationImplement() {
+            if (voxel_features_) checkRuntime(cudaFree(voxel_features_));
+            if (voxel_num_) checkRuntime(cudaFree(voxel_num_));
+            if (voxel_idxs_) checkRuntime(cudaFree(voxel_idxs_));
+
+            if (features_input_) checkRuntime(cudaFree(features_input_));
+            if (params_input_) checkRuntime(cudaFree(params_input_));
+
+            if (mask_) checkRuntime(cudaFree(mask_));
+            if (voxels_) checkRuntime(cudaFree(voxels_));
+            if (voxelsList_) checkRuntime(cudaFree(voxelsList_));
+        }
+
+    bool init(VoxelizationParameter param) {
+        param_ = param;
+
+        mask_size_ = param_.grid_size.z * param_.grid_size.y
+                    * param_.grid_size.x * sizeof(unsigned int);
+        voxels_size_ = param_.grid_size.z * param_.grid_size.y * param_.grid_size.x
+                    * param_.max_points_per_voxel * 4 * sizeof(float);
+        voxel_features_size_ = param_.max_voxels * param_.max_points_per_voxel * 4 * sizeof(float);
+        voxel_num_size_ = param_.max_voxels * sizeof(unsigned int);
+        voxel_idxs_size_ = param_.max_voxels * 4 * sizeof(unsigned int);
+        features_input_size_ = param_.max_voxels * param_.max_points_per_voxel * 10 * sizeof(float);
+
+        checkRuntime(cudaMallocManaged((void **)&voxel_features_, voxel_features_size_));
+        checkRuntime(cudaMallocManaged((void **)&voxel_num_, voxel_num_size_));
+
+        checkRuntime(cudaMallocManaged((void **)&features_input_, features_input_size_));
+        checkRuntime(cudaMallocManaged((void **)&voxel_idxs_, voxel_idxs_size_));
+        checkRuntime(cudaMallocManaged((void **)&params_input_, sizeof(unsigned int)));
+
+        checkRuntime(cudaMallocManaged((void **)&mask_, mask_size_));
+        checkRuntime(cudaMallocManaged((void **)&voxels_, voxels_size_));
+        checkRuntime(cudaMallocManaged((void **)&voxelsList_, param_.max_points * sizeof(int)));
+
+        return true;
+    }
+
+    // points and voxels must be of half type
+    virtual void forward(const float *_points, int num_points, void *stream) override {
+        cudaStream_t _stream = reinterpret_cast<cudaStream_t>(stream);
+        // const half *_points = reinterpret_cast<const half *>(points);
+
+        checkRuntime(cudaMemsetAsync(voxel_features_, 0, voxel_features_size_, _stream));
+        checkRuntime(cudaMemsetAsync(voxel_num_, 0, voxel_num_size_, _stream));
+
+        checkRuntime(cudaMemsetAsync(mask_, 0, mask_size_, _stream));
+        checkRuntime(cudaMemsetAsync(voxels_, 0, voxels_size_, _stream));
+        checkRuntime(cudaMemsetAsync(voxelsList_, 0, param_.max_points * sizeof(int), _stream));
+
+        checkRuntime(cudaMemsetAsync(features_input_, 0, features_input_size_, _stream));
+        checkRuntime(cudaMemsetAsync(voxel_idxs_, 0, voxel_idxs_size_, _stream));
+        checkRuntime(cudaMemsetAsync(params_input_, 0, sizeof(unsigned int), _stream));
+
+        checkRuntime(generateVoxels_random_launch(_points, num_points,
+                    param_.min_range.x, param_.max_range.x,
+                    param_.min_range.y, param_.max_range.y,
+                    param_.min_range.z, param_.max_range.z,
+                    param_.voxel_size.x, param_.voxel_size.y, param_.voxel_size.z,
+                    param_.grid_size.y, param_.grid_size.x,
+                    mask_, voxels_, _stream));
+
+        checkRuntime(generateBaseFeatures_launch(mask_, voxels_,
+                    param_.grid_size.y, param_.grid_size.x,
+                    params_input_,
+                    voxel_features_,
+                    voxel_num_,
+                    voxel_idxs_, _stream));
+
+        checkRuntime(generateFeatures_launch(voxel_features_,
+                    voxel_num_,
+                    voxel_idxs_,
+                    params_input_, param_.max_voxels,
+                    param_.voxel_size.x, param_.voxel_size.y, param_.voxel_size.z,
+                    param_.min_range.x, param_.min_range.y, param_.min_range.z,
+                    features_input_, _stream));
+
+        checkRuntime(cudaStreamSynchronize(_stream));
+    }
+
+    virtual const void *features() override { return features_input_; }
+
+    virtual const void *coords() override { return voxel_idxs_; }
+
+    virtual const void *params() override { return params_input_; }
+
+    private:
+        VoxelizationParameter param_;
+        
+        unsigned int *mask_ = nullptr;
+        float *voxels_ = nullptr;
+        int *voxelsList_ = nullptr;
+        float *voxel_features_ = nullptr;
+        unsigned int *voxel_num_ = nullptr;
+        unsigned int *pillar_num_ = nullptr;
+
+        float *features_input_ = nullptr;
+        unsigned int *voxel_idxs_ = nullptr;
+        unsigned int *params_input_ = nullptr;
+
+        unsigned int mask_size_;
+        unsigned int voxels_size_;
+        unsigned int voxel_features_size_;
+        unsigned int voxel_num_size_;
+        unsigned int voxel_idxs_size_;
+        unsigned int features_input_size_ = 0;
+};
+
+std::shared_ptr<Voxelization> create_voxelization(VoxelizationParameter param) {
+  std::shared_ptr<VoxelizationImplement> impl(new VoxelizationImplement());
+  if (!impl->init(param)) {
+    impl.reset();
+  }
+  return impl;
+}
+
+};  // namespace lidar
+};  // namespace pointpillar

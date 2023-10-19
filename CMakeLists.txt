@@ -37,6 +37,7 @@ include_directories(
     $ENV{TensorRT_Inc}
 	../libraries/cuOSD/src
     src/common
+	src/plugin
 	src/pointpillar
 )
 
@@ -44,6 +45,11 @@ link_directories(
     $ENV{CUDA_Lib}
     $ENV{TensorRT_Lib}
     build
+)
+
+file(GLOB_RECURSE PLUGIN_FILES 
+    src/plugin/*.cu 
+    src/plugin/*.cpp
 )
 
 file(GLOB_RECURSE CORE_FILES 
@@ -60,13 +66,23 @@ file(GLOB_RECURSE VISUALIZE_FILES
 )
 
 ####################### libpointpillar_core.so ##########################
+cuda_add_library(ppscatter_plugin SHARED 
+  	${PLUGIN_FILES}
+)
+
+target_link_libraries(ppscatter_plugin
+	libnvinfer.so
+)
+#######################################################################
+
+
+####################### libpointpillar_core.so ##########################
 cuda_add_library(pointpillar_core SHARED 
   	${CORE_FILES}
 )
 
 target_link_libraries(pointpillar_core
 	libnvinfer.so
-	libnvonnxparser.so
 )
 #######################################################################
 
@@ -80,6 +96,5 @@ cuda_add_executable(pointpillar
 target_link_libraries(pointpillar
 	pointpillar_core
 	libnvinfer.so
-	libnvonnxparser.so
 )
 #######################################################################
