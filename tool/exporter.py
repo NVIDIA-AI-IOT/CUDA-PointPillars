@@ -27,7 +27,7 @@ from pcdet.datasets import DatasetTemplate
 from pcdet.config import cfg, cfg_from_yaml_file
 
 from exporter_paramters import export_paramters as export_paramters
-from simplifier_onnx import simplify_preprocess, simplify_postprocess
+from simplifier_onnx import divide_onnx, simplify_preprocess, simplify_postprocess
 
 class DemoDataset(DatasetTemplate):
     def __init__(self, dataset_cfg, class_names, training=True, root_path=None, logger=None, ext='.bin'):
@@ -95,9 +95,12 @@ def main():
 
     model = build_network(model_cfg=cfg.MODEL, num_class=len(cfg.CLASS_NAMES), dataset=demo_dataset)
     model.load_params_from_file(filename=args.ckpt, logger=logger, to_cpu=True)
+
     model.cuda()
     model.eval()
+
     np.set_printoptions(threshold=np.inf)
+
     with torch.no_grad():
 
       MAX_VOXELS = 10000
@@ -134,31 +137,21 @@ def main():
           output_names = ['cls_preds', 'box_preds', 'dir_cls_preds'], # the model's output names
           )
 
-      onnx_raw = onnx.load("./pointpillar_raw.onnx")  # load onnx model
-      onnx_trim_post = simplify_postprocess(onnx_raw)
-      
-      onnx_simp, check = simplify(onnx_trim_post)
-      assert check, "Simplified ONNX model could not be validated"
+    onnx_raw = onnx.load("./pointpillar_raw.onnx")  # load onnx model
+    onnx_trim_post = simplify_postprocess(onnx_raw)
 
-      onnx_final = simplify_preprocess(onnx_simp)
-      onnx.save(onnx_final, "pointpillar.onnx")
-      print('finished exporting onnx')
+    onnx_simp, check = simplify(onnx_trim_post)
+    assert check, "Simplified ONNX model could not be validated"
+
+    onnx_final = simplify_preprocess(onnx_simp)
+    onnx.save(onnx_final, "pointpillar.onnx")
+
+    pfe_onnx, backbone_onnx = divide_onnx(onnx_final)
+    onnx.save(pfe_onnx, "pfe.onnx")
+    onnx.save(backbone_onnx, "backbone.onnx")
+    print('finished exporting onnx')
 
     logger.info('[PASS] ONNX EXPORTED.')
 
-import onnx_graphsurgeon as gs
-
-def test():
-    model = onnx.load("pointpillar.onnx")
-    graph = gs.import_onnx(model)
-    rm_node = [node for node in graph.nodes if node.op == "ReduceMax"][-1]
-
-    graph.inputs = [graph.inputs[0]]
-    graph.outputs = [rm_node.outputs[0]]
-
-    graph.cleanup().toposort()
-    onnx.save(gs.export_onnx(graph), "pointnet.onnx")
-
 if __name__ == '__main__':
     main()
-    test()

@@ -133,6 +133,26 @@ def simplify_preprocess(onnx_model):
 
   return gs.export_onnx(graph)
 
+def divide_onnx(onnx_model):
+
+    graph = gs.import_onnx(onnx_model)
+    rm_node = [node for node in graph.nodes if node.op == "ReduceMax"][-1]
+    graph.inputs = [graph.inputs[0]]
+    graph.outputs = [rm_node.outputs[0]]
+    graph.outputs[0].name = "feature"
+    graph.cleanup().toposort()
+    pfe_graph = gs.export_onnx(graph)
+
+    graph = gs.import_onnx(onnx_model)
+    plugin_node = [node for node in graph.nodes if node.op == "PPScatterPlugin"][0]
+    plugin_node.inputs[0] = rm_node.outputs[0]
+    graph.inputs[0] = rm_node.outputs[0]
+    graph.inputs[0].name = "feature"
+    graph.cleanup().toposort()
+    backbone_graph = gs.export_onnx(graph)
+
+    return pfe_graph, backbone_graph
+
 if __name__ == '__main__':
     mode_file = "pointpillar-native-sim.onnx"
     simplify_preprocess(onnx.load(mode_file))
