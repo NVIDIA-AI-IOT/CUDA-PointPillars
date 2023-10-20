@@ -25,9 +25,10 @@
 #define __POINTPILLAR_HPP__
 
 #include "lidar-voxelization.hpp"
-#include "lidar-pfe.hpp"
+// #include "lidar-pfe.hpp"
 #include "lidar-backbone.hpp"
 #include "lidar-postprocess.hpp"
+#include "nms.hpp"
 
 namespace pointpillar {
 namespace lidar {
@@ -37,11 +38,12 @@ struct CoreParameter {
     std::string pfe_model;
     std::string lidar_model;
     PostProcessParameter lidar_post;
+    float nms_thresh = 0.01;
 };
 
 class Core {
     public:
-        virtual std::vector<postprocess::BoundingBox> forward(const nvtype::half *lidar_points, int num_points, void *stream) = 0;
+        virtual std::vector<BoundingBox> forward(const float *lidar_points, int num_points, void *stream) = 0;
 
         virtual void print() = 0;
         virtual void set_timer(bool enable) = 0;

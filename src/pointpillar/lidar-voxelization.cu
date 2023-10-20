@@ -85,58 +85,6 @@ cudaError_t generateVoxels_random_launch(const float *points, size_t points_size
   return err;
 }
 
-static __global__ void generateVoxelsList_kernel(float *points, size_t points_size,
-        float min_x_range, float max_x_range,
-        float min_y_range, float max_y_range,
-        float min_z_range, float max_z_range,
-        float pillar_x_size, float pillar_y_size, float pillar_z_size,
-        int grid_y_size, int grid_x_size,
-        unsigned int *mask, int *voxelsList)
-{
-  int point_idx = blockIdx.x * blockDim.x + threadIdx.x;
-  if(point_idx >= points_size) return;
-
-  float4 point = ((float4*)points)[point_idx];
-
-  if(point.x<min_x_range||point.x>=max_x_range
-    || point.y<min_y_range||point.y>=max_y_range
-    || point.z<min_z_range||point.z>=max_z_range)
-  {
-    voxelsList[point_idx] = -1;
-    return;
-  }
-
-  int voxel_idx = floorf((point.x - min_x_range)/pillar_x_size);
-  int voxel_idy = floorf((point.y - min_y_range)/pillar_y_size);
-  unsigned int voxel_index = voxel_idy * grid_x_size
-                            + voxel_idx;
-
-  atomicAdd(&(mask[voxel_index]), 1);
-  voxelsList[point_idx] = voxel_index;
-
-}
-
-static __global__ void generateVoxels_kernel(float *points, size_t points_size,
-        int *voxelsList,
-        unsigned int *mask, float *voxels)
-{
-  int point_idx = blockIdx.x * blockDim.x + threadIdx.x;
-  if(point_idx >= points_size) return;
-
-  int voxel_index = voxelsList[point_idx];
-
-  if (voxel_index == -1) return;
-  int point_id = atomicAdd(&(mask[voxel_index]), 1);
-
-  if(point_id >= POINTS_PER_VOXEL) return;
-  float *address = voxels + (voxel_index*POINTS_PER_VOXEL + point_id)*4;
-  float4 point = ((float4*)points)[point_idx];
-  atomicExch(address+0, point.x);
-  atomicExch(address+1, point.y);
-  atomicExch(address+2, point.z);
-  atomicExch(address+3, point.w);
-}
-
 static __global__ void generateBaseFeatures_kernel(unsigned int *mask, float *voxels,
         int grid_y_size, int grid_x_size,
         unsigned int *pillar_num,
@@ -414,11 +362,11 @@ class VoxelizationImplement : public Voxelization {
         checkRuntime(cudaStreamSynchronize(_stream));
     }
 
-    virtual const void *features() override { return features_input_; }
+    virtual const float *features() override { return features_input_; }
 
-    virtual const void *coords() override { return voxel_idxs_; }
+    virtual const unsigned int *coords() override { return voxel_idxs_; }
 
-    virtual const void *params() override { return params_input_; }
+    virtual const unsigned int *params() override { return params_input_; }
 
     private:
         VoxelizationParameter param_;

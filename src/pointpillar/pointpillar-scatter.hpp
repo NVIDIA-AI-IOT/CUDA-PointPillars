@@ -15,8 +15,8 @@
  * limitations under the License.
  */
 
-#ifndef _POINTPILLAR_SCATTER_H_
-#define _POINTPILLAR_SCATTER_H_
+#ifndef _POINTPILLAR_SCATTER_HPP_
+#define _POINTPILLAR_SCATTER_HPP_
 
 #include <vector>
 #include <string>
@@ -94,4 +94,4 @@ private:
 } // namespace plugin
 } // namespace nvinfer1
 
-#endif _POINTPILLAR_SCATTER_H_
+#endif  // _POINTPILLAR_SCATTER_HPP_

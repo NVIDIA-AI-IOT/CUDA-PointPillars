@@ -32,115 +32,111 @@ namespace pointpillar {
 namespace lidar {
 
 class CoreImplement: public Core {
-    public:
-        virtual ~CoreImplement() {
-            if (lidar_points_device_) checkRuntime(cudaFree(lidar_points_device_));
-            if (lidar_points_host_) checkRuntime(cudaFreeHost(lidar_points_host_));
-
-            if (cls_output_) checkRuntime(cudaFree(cls_output_));
-            if (box_output_) checkRuntime(cudaFree(box_output_));
-            if (dir_cls_output_) checkRuntime(cudaFree(dir_cls_output_));
-            if (bndbox_output_) checkRuntime(cudaFree(bndbox_output_));
-        }
-
-        bool init(const CoreParameter& param) {
-            lidar_voxelization_ = lidar::create_voxelization(param.voxelization);
-            if (lidar_voxelization_ == nullptr) {
-                printf("Failed to create lidar voxelization.\n");
-                return false;
-            }
-
-            lidar_pfe_ = lidar::create_pfe(param.pfe_model);
-                if (lidar_pfe_ == nullptr) {
-                printf("Failed to create lidar pfe.\n");
-                return false;
-            }
-
-            lidar_backbone_head_ = lidar::create_backbone_head_(param.lidar_model);
-                if (lidar_backbone_head_ == nullptr) {
-                printf("Failed to create lidar backbone & head.\n");
-                return false;
-            }
-
-            lidar_postprocess_ = lidar::create_postprocess(param.lidar_post);
-            if (lidar_postprocess_ == nullptr) {
-                printf("Failed to create lidar postprocess.\n");
-                return false;
-            }
-
-            //output of TRT -- input of post-process
-            cls_size_ = params_.feature_x_size * params_.feature_y_size * params_.num_classes * params_.num_anchors * sizeof(float);
-            box_size_ = params_.feature_x_size * params_.feature_y_size * params_.num_box_values * params_.num_anchors * sizeof(float);
-            dir_cls_size_ = params_.feature_x_size * params_.feature_y_size * params_.num_dir_bins * params_.num_anchors * sizeof(float);
-            checkRuntime(cudaMallocManaged((void **)&cls_output_, cls_size_));
-            checkRuntime(cudaMallocManaged((void **)&box_output_, box_size_));
-            checkRuntime(cudaMallocManaged((void **)&dir_cls_output_, dir_cls_size_));
-
-            //output of post-process
-            bndbox_size_ = (params_.feature_x_size * params_.feature_y_size * params_.num_anchors * 9 + 1) * sizeof(float);
-            checkRuntime(cudaMallocManaged((void **)&bndbox_output_, bndbox_size_));
-
-            res_.reserve(100);
-            return;
-        }
-
-    private:
-        CoreParameter param_;
-        nv::EventTimer timer_;
-        nvtype::half* lidar_points_device_ = nullptr;
-        nvtype::half* lidar_points_host_ = nullptr;
-        size_t capacity_points_ = 0;
-        size_t bytes_capacity_points_ = 0;
-
-        std::shared_ptr<lidar::Voxelization> lidar_voxelization_;
-        std::shared_ptr<lidar::PFE> lidar_pfe_;
-        std::shared_ptr<lidar::BackboneHead> lidar_backbone_head_;
-        std::shared_ptr<lidar::PostProcess> lidar_postprocess_;
-
-        bool enable_timer_ = false;
-
-        //output of TRT -- input of post-process
-        float *cls_output_ = nullptr;
-        float *box_output_ = nullptr;
-        float *dir_cls_output_ = nullptr;
-        unsigned int cls_size_;
-        unsigned int box_size_;
-        unsigned int dir_cls_size_;
-
-        //output of post-process
-        float *bndbox_output_ = nullptr;
-        unsigned int bndbox_size_ = 0;
-
-        std::vector<postprocess::BoundingBox> res_;
-};
-
-int PointPillar::doinfer(void*points_data, unsigned int points_size, std::vector<Bndbox> &nms_pred)
-{
-    void *buffers[] = {features_input_, voxel_idxs_, params_input_, cls_output_, box_output_, dir_cls_output_};
-    trt_->doinfer(buffers);
-
-    post_->doPostprocessCuda(cls_output_, box_output_, dir_cls_output_,
-                            bndbox_output_);
-    checkRuntime(cudaDeviceSynchronize());
-    float obj_count = bndbox_output_[0];
-
-    int num_obj = static_cast<int>(obj_count);
-    auto output = bndbox_output_ + 1;
-
-    for (int i = 0; i < num_obj; i++) {
-        auto Bb = Bndbox(output[i * 9],
-                        output[i * 9 + 1], output[i * 9 + 2], output[i * 9 + 3],
-                        output[i * 9 + 4], output[i * 9 + 5], output[i * 9 + 6],
-                        static_cast<int>(output[i * 9 + 7]),
-                        output[i * 9 + 8]);
-        res_.push_back(Bb);
+public:
+    virtual ~CoreImplement() {
+        if (lidar_points_device_) checkRuntime(cudaFree(lidar_points_device_));
+        if (lidar_points_host_) checkRuntime(cudaFreeHost(lidar_points_host_));
     }
 
-    nms_cpu(res_, params_.nms_thresh, nms_pred);
-    res_.clear();
+    bool init(const CoreParameter& param) {
+        lidar_voxelization_ = create_voxelization(param.voxelization);
+        if (lidar_voxelization_ == nullptr) {
+            printf("Failed to create lidar voxelization.\n");
+            return false;
+        }
 
-    return 0;
-}
+        // lidar_pfe_ = create_pfe(param.pfe_model);
+        //     if (lidar_pfe_ == nullptr) {
+        //     printf("Failed to create lidar pfe.\n");
+        //     return false;
+        // }
+
+        lidar_backbone_ = create_backbone(param.lidar_model);
+            if (lidar_backbone_ == nullptr) {
+            printf("Failed to create lidar backbone & head.\n");
+            return false;
+        }
+
+        lidar_postprocess_ = create_postprocess(param.lidar_post);
+        if (lidar_postprocess_ == nullptr) {
+            printf("Failed to create lidar postprocess.\n");
+            return false;
+        }
+
+        res_.reserve(100);
+
+        capacity_points_ = 300000;
+        bytes_capacity_points_ = capacity_points_ * param.voxelization.num_feature * sizeof(float);
+        checkRuntime(cudaMalloc(&lidar_points_device_, bytes_capacity_points_));
+        checkRuntime(cudaMallocHost(&lidar_points_host_, bytes_capacity_points_));
+        param_ = param;
+        return true;
+    }
+
+    std::vector<BoundingBox> forward_only(const float *lidar_points, int num_points, void *stream) {
+        int cappoints = static_cast<int>(capacity_points_);
+        if (num_points > cappoints) {
+            printf("If it exceeds %d points, the default processing will simply crop it out.\n", cappoints);
+        }
+
+        num_points = std::min(cappoints, num_points);
+
+        cudaStream_t _stream = static_cast<cudaStream_t>(stream);
+        size_t bytes_points = num_points * param_.voxelization.num_feature * sizeof(float);
+        checkRuntime(cudaMemcpyAsync(lidar_points_host_, lidar_points, bytes_points, cudaMemcpyHostToHost, _stream));
+        checkRuntime(cudaMemcpyAsync(lidar_points_device_, lidar_points_host_, bytes_points, cudaMemcpyHostToDevice, _stream));
+
+        this->lidar_voxelization_->forward(lidar_points_device_, num_points, _stream);
+        this->lidar_backbone_->forward(this->lidar_voxelization_->features(), this->lidar_voxelization_->coords(), this->lidar_voxelization_->params(), _stream);
+        this->lidar_postprocess_->forward(this->lidar_backbone_->cls(), this->lidar_backbone_->box(), this->lidar_backbone_->dir(), _stream);
+
+        float* bndbox_output_ = (float *)this->lidar_postprocess_->bndbox();
+        int num_obj = static_cast<int>(bndbox_output_[0]);
+        auto output = bndbox_output_ + 1;
+
+        for (int i = 0; i < num_obj; i++) {
+            auto Bb = BoundingBox(output[i * 9], output[i * 9 + 1], output[i * 9 + 2], output[i * 9 + 3], output[i * 9 + 4],
+                                output[i * 9 + 5], output[i * 9 + 6], static_cast<int>(output[i * 9 + 7]), output[i * 9 + 8]);
+            res_.push_back(Bb);
+        }
+
+        std::vector<BoundingBox> nms_pred;
+        nms_cpu(res_, param_.nms_thresh, nms_pred);
+        res_.clear();
+        return nms_pred;
+    }
+
+    virtual std::vector<BoundingBox> forward(const float *lidar_points, int num_points, void *stream) override {
+        // if (enable_timer_) {
+        //     return this->forward_timer(lidar_points, num_points, stream);
+        // } else {
+            return this->forward_only(lidar_points, num_points, stream);
+        // }
+    }
+
+    virtual void set_timer(bool enable) override { enable_timer_ = enable; }
+
+    virtual void print() override {
+        lidar_backbone_->print();
+    }
+
+private:
+    CoreParameter param_;
+    nv::EventTimer timer_;
+    float* lidar_points_device_ = nullptr;
+    float* lidar_points_host_ = nullptr;
+    size_t capacity_points_ = 0;
+    size_t bytes_capacity_points_ = 0;
+
+    std::shared_ptr<Voxelization> lidar_voxelization_;
+    // std::shared_ptr<PFE> lidar_pfe_;
+    std::shared_ptr<Backbone> lidar_backbone_;
+    std::shared_ptr<PostProcess> lidar_postprocess_;
+
+    bool enable_timer_ = false;
+
+    std::vector<BoundingBox> res_;
+};
 
 std::shared_ptr<Core> create_core(const CoreParameter& param) {
   std::shared_ptr<CoreImplement> instance(new CoreImplement());

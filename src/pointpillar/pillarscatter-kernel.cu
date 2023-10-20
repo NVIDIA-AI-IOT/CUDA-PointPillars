@@ -15,7 +15,9 @@
  * limitations under the License.
  */
 
-#include "kernel.h"
+#include "pillarscatter-kernel.hpp"
+#include <stdio.h>
+#include <stdlib.h>
 
 const int PILLARS_PER_BLOCK = 64;     // one thread deals with one pillar and a block has PILLARS_PER_BLOCK threads
 const int PILLAR_FEATURE_SIZE = 64;   // feature count for one pillar depands on "params.h"

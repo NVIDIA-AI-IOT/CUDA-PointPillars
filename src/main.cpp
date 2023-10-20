@@ -15,14 +15,15 @@
  * limitations under the License.
  */
 
+#include <cuda_runtime.h>
+
+#include <string.h>
 #include <iostream>
 #include <sstream>
 #include <fstream>
 
-#include "cuda_runtime.h"
-
-#include "./params.h"
 #include "pointpillar.hpp"
+#include "common/check.hpp"
 
 std::string Data_File = "../data/";
 std::string Save_Dir = "../eval/kitti/object/pred_velo/";
@@ -84,7 +85,7 @@ int loadData(const char *file, void **data, unsigned int *length)
   return 0;  
 }
 
-void SaveBoxPred(std::vector<Bndbox> boxes, std::string file_name)
+void SaveBoxPred(std::vector<pointpillar::lidar::BoundingBox> boxes, std::string file_name)
 {
     std::ofstream ofs;
     ofs.open(file_name, std::ios::out);
@@ -110,82 +111,76 @@ void SaveBoxPred(std::vector<Bndbox> boxes, std::string file_name)
     return;
 };
 
-int main(int argc, const char **argv)
-{
-  Getinfo();
+std::shared_ptr<pointpillar::lidar::Core> create_core() {
+    pointpillar::lidar::VoxelizationParameter vp;
+    vp.min_range = nvtype::Float3(0.0, -39.68f, -3.0);
+    vp.max_range = nvtype::Float3(69.12f, 39.68f, 1.0);
+    vp.voxel_size = nvtype::Float3(0.16f, 0.16f, 4.0f);
+    vp.grid_size =
+        vp.compute_grid_size(vp.max_range, vp.min_range, vp.voxel_size);
+    vp.max_voxels = 40000;
+    vp.max_points_per_voxel = 32;
+    vp.max_points = 300000;
+    vp.num_feature = 4;
 
-  cudaEvent_t start, stop;
-  float elapsedTime = 0.0f;
-  cudaStream_t stream = NULL;
+    pointpillar::lidar::PostProcessParameter pp;
+    pp.min_range = vp.min_range;
+    pp.max_range = vp.max_range;
+    pp.feature_size = nvtype::Int2(vp.grid_size.x/2, vp.grid_size.y/2);
 
-  checkRuntime(cudaEventCreate(&start));
-  checkRuntime(cudaEventCreate(&stop));
-  checkRuntime(cudaStreamCreate(&stream));
+    pointpillar::lidar::CoreParameter param;
+    param.voxelization = vp;
+    param.lidar_model = "../model/pointpillar.onnx.cache";
+    param.lidar_post = pp;
+    return pointpillar::lidar::create_core(param);
+}
 
-  Params params_;
+int main(int argc, char** argv) {
+    Getinfo();
 
-  std::vector<Bndbox> nms_pred;
-  nms_pred.reserve(100);
+    auto core = create_core();
+    if (core == nullptr) {
+      printf("Core has been failed.\n");
+      return -1;
+    }
 
-  PointPillar pointpillar(Model_File, stream);
+    cudaStream_t stream;
+    cudaStreamCreate(&stream);
+  
+    core->print();
+    core->set_timer(false);
 
-  for (int i = 0; i < 10; i++)
-  {
-    std::string dataFile = Data_File;
+    for (int i = 0; i < 10; i++)
+    {
+        std::string dataFile = Data_File;
+        std::stringstream ss; ss << i;
+        std::string _str = ss.str();
+        std::string index_str = std::string(6 - _str.length(), '0') + _str;
+        dataFile += index_str;
+        dataFile +=".bin";
 
-    std::stringstream ss;
+        std::cout << "<<<<<<<<<<<" <<std::endl;
+        std::cout << "load file: "<< dataFile <<std::endl;
 
-    ss<< i;
+        //load points cloud
+        unsigned int length = 0;
+        void *data = NULL;
+        std::shared_ptr<char> buffer((char *)data, std::default_delete<char[]>());
+        loadData(dataFile.data(), &data, &length);
+        buffer.reset((char *)data);
+        float* points = (float*)buffer.get();
+        int points_size = length/sizeof(float)/4;
+        std::cout << "find points num: "<< points_size <<std::endl;
+    
+        auto bboxes = core->forward(points, points_size, stream);
+        std::cout<<"Bndbox objs: "<< bboxes.size()<<std::endl;
 
-    int n_zero = 6;
-    std::string _str = ss.str();
-    std::string index_str = std::string(n_zero - _str.length(), '0') + _str;
-    dataFile += index_str;
-    dataFile +=".bin";
+        std::string save_file_name = Save_Dir + index_str + ".txt";
+        SaveBoxPred(bboxes, save_file_name);
 
-    std::cout << "<<<<<<<<<<<" <<std::endl;
-    std::cout << "load file: "<< dataFile <<std::endl;
+        std::cout << ">>>>>>>>>>>" <<std::endl;
+    }
 
-    //load points cloud
-    unsigned int length = 0;
-    void *data = NULL;
-    std::shared_ptr<char> buffer((char *)data, std::default_delete<char[]>());
-    loadData(dataFile.data(), &data, &length);
-    buffer.reset((char *)data);
-
-    float* points = (float*)buffer.get();
-    size_t points_size = length/sizeof(float)/4;
-
-    std::cout << "find points num: "<< points_size <<std::endl;
-
-    float *points_data = nullptr;
-    unsigned int points_data_size = points_size * 4 * sizeof(float);
-    checkRuntime(cudaMallocManaged((void **)&points_data, points_data_size));
-    checkRuntime(cudaMemcpy(points_data, points, points_data_size, cudaMemcpyDefault));
-    checkRuntime(cudaDeviceSynchronize());
-
-    cudaEventRecord(start, stream);
-
-    pointpillar.doinfer(points_data, points_size, nms_pred);
-    cudaEventRecord(stop, stream);
-    cudaEventSynchronize(stop);
-    cudaEventElapsedTime(&elapsedTime, start, stop);
-    std::cout<<"TIME: pointpillar: "<< elapsedTime <<" ms." <<std::endl;
-
-    checkRuntime(cudaFree(points_data));
-
-    std::cout<<"Bndbox objs: "<< nms_pred.size()<<std::endl;
-    std::string save_file_name = Save_Dir + index_str + ".txt";
-    SaveBoxPred(nms_pred, save_file_name);
-
-    nms_pred.clear();
-
-    std::cout << ">>>>>>>>>>>" <<std::endl;
-  }
-
-  checkRuntime(cudaEventDestroy(start));
-  checkRuntime(cudaEventDestroy(stop));
-  checkRuntime(cudaStreamDestroy(stream));
-
-  return 0;
+    checkRuntime(cudaStreamDestroy(stream));
+    return 0;
 }

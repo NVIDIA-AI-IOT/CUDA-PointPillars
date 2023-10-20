@@ -29,10 +29,10 @@ struct VoxelizationParameter {
     nvtype::Float3 max_range;
     nvtype::Float3 voxel_size;
     nvtype::Int3 grid_size;
-    int num_feature;
     int max_voxels;
     int max_points_per_voxel;
     int max_points;
+    int num_feature;
 
     static nvtype::Int3 compute_grid_size(const nvtype::Float3& max_range, const nvtype::Float3& min_range,
                                         const nvtype::Float3& voxel_size);
@@ -43,9 +43,9 @@ class Voxelization {
     // points and voxels must be of half-float device pointer
     virtual void forward(const float *points, int num_points, void *stream = nullptr) = 0;
 
-    virtual const void* features() = 0;
-    virtual const void* coords() = 0;
-    virtual const void* params() = 0;
+    virtual const float* features() = 0;
+    virtual const unsigned int* coords() = 0;
+    virtual const unsigned int* params() = 0;
 };
 
 std::shared_ptr<Voxelization> create_voxelization(VoxelizationParameter param);

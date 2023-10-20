@@ -23,10 +23,11 @@
 
 #include "pointpillar-scatter.hpp"
 
+#include <iostream>
 #include <cassert>
 #include <cstring>
 
-#include "kernel.h"
+#include "pillarscatter-kernel.hpp"
 
 using namespace nvinfer1;
 using nvinfer1::plugin::PPScatterPlugin;
@@ -157,7 +158,7 @@ int PPScatterPlugin::enqueue(const nvinfer1::PluginTensorDesc* inputDesc,
                 spatial_feature_data,
                 stream
                 );
-            assert(status == STATUS_SUCCESS);
+            assert(status == 0);
             return status;
         }
         else if(inputType == nvinfer1::DataType::kFLOAT){
@@ -173,11 +174,11 @@ int PPScatterPlugin::enqueue(const nvinfer1::PluginTensorDesc* inputDesc,
                 spatial_feature_data,
                 stream
                 );
-            assert(status == STATUS_SUCCESS);
+            assert(status == 0);
             return status;
         }
         else{
-            assert(status == STATUS_SUCCESS);
+            assert(status == 0);
             return status;
         }
     }
