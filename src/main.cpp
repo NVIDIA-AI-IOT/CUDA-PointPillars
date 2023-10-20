@@ -148,7 +148,7 @@ int main(int argc, char** argv) {
     cudaStreamCreate(&stream);
   
     core->print();
-    core->set_timer(false);
+    core->set_timer(true);
 
     for (int i = 0; i < 10; i++)
     {

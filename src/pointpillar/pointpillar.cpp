@@ -23,7 +23,7 @@
 
 #include "pointpillar.hpp"
 
-#include <vector>
+#include <numeric>
 
 #include "common/check.hpp"
 #include "common/timer.hpp"
@@ -106,12 +106,64 @@ public:
         return nms_pred;
     }
 
+    std::vector<BoundingBox> forward_timer(const float *lidar_points, int num_points, void *stream) {
+        int cappoints = static_cast<int>(capacity_points_);
+        if (num_points > cappoints) {
+            printf("If it exceeds %d points, the default processing will simply crop it out.\n", cappoints);
+        }
+
+        num_points = std::min(cappoints, num_points);
+
+        printf("==================PointPillars===================\n");
+        std::vector<float> times;
+        cudaStream_t _stream = static_cast<cudaStream_t>(stream);
+        timer_.start(_stream);
+
+        size_t bytes_points = num_points * param_.voxelization.num_feature * sizeof(float);
+        checkRuntime(cudaMemcpyAsync(lidar_points_host_, lidar_points, bytes_points, cudaMemcpyHostToHost, _stream));
+        checkRuntime(cudaMemcpyAsync(lidar_points_device_, lidar_points_host_, bytes_points, cudaMemcpyHostToDevice, _stream));
+        timer_.stop("[NoSt] CopyLidar");
+
+        timer_.start(_stream);
+        this->lidar_voxelization_->forward(lidar_points_device_, num_points, _stream);
+        times.emplace_back(timer_.stop("Lidar Voxelization"));
+
+        timer_.start(_stream);
+        this->lidar_backbone_->forward(this->lidar_voxelization_->features(), this->lidar_voxelization_->coords(), this->lidar_voxelization_->params(), _stream);
+        times.emplace_back(timer_.stop("Lidar Backbone & Head"));
+
+        timer_.start(_stream);
+        this->lidar_postprocess_->forward(this->lidar_backbone_->cls(), this->lidar_backbone_->box(), this->lidar_backbone_->dir(), _stream);
+        times.emplace_back(timer_.stop("Lidar Decoder"));
+
+        timer_.start(_stream);
+        float* bndbox_output_ = (float *)this->lidar_postprocess_->bndbox();
+        int num_obj = static_cast<int>(bndbox_output_[0]);
+        auto output = bndbox_output_ + 1;
+
+        for (int i = 0; i < num_obj; i++) {
+            auto Bb = BoundingBox(output[i * 9], output[i * 9 + 1], output[i * 9 + 2], output[i * 9 + 3], output[i * 9 + 4],
+                                output[i * 9 + 5], output[i * 9 + 6], static_cast<int>(output[i * 9 + 7]), output[i * 9 + 8]);
+            res_.push_back(Bb);
+        }
+
+        std::vector<BoundingBox> nms_pred;
+        nms_cpu(res_, param_.nms_thresh, nms_pred);
+        res_.clear();
+        times.emplace_back(timer_.stop("NMS"));
+
+        float total_time = std::accumulate(times.begin(), times.end(), 0.0f, std::plus<float>{});
+        printf("Total: %.3f ms\n", total_time);
+        printf("=============================================\n");
+        return nms_pred;
+    }
+
     virtual std::vector<BoundingBox> forward(const float *lidar_points, int num_points, void *stream) override {
-        // if (enable_timer_) {
-        //     return this->forward_timer(lidar_points, num_points, stream);
-        // } else {
+        if (enable_timer_) {
+            return this->forward_timer(lidar_points, num_points, stream);
+        } else {
             return this->forward_only(lidar_points, num_points, stream);
-        // }
+        }
     }
 
     virtual void set_timer(bool enable) override { enable_timer_ = enable; }
