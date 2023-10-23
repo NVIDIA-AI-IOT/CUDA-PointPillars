@@ -306,16 +306,16 @@ class VoxelizationImplement : public Voxelization {
         voxel_idxs_size_ = param_.max_voxels * 4 * sizeof(unsigned int);
         features_input_size_ = param_.max_voxels * param_.max_points_per_voxel * 10 * sizeof(nvtype::half);
 
-        checkRuntime(cudaMallocManaged((void **)&voxel_features_, voxel_features_size_));
-        checkRuntime(cudaMallocManaged((void **)&voxel_num_, voxel_num_size_));
+        checkRuntime(cudaMalloc((void **)&voxel_features_, voxel_features_size_));
+        checkRuntime(cudaMalloc((void **)&voxel_num_, voxel_num_size_));
 
-        checkRuntime(cudaMallocManaged((void **)&features_input_, features_input_size_));
-        checkRuntime(cudaMallocManaged((void **)&voxel_idxs_, voxel_idxs_size_));
-        checkRuntime(cudaMallocManaged((void **)&params_input_, sizeof(unsigned int)));
+        checkRuntime(cudaMalloc((void **)&features_input_, features_input_size_));
+        checkRuntime(cudaMalloc((void **)&voxel_idxs_, voxel_idxs_size_));
+        checkRuntime(cudaMalloc((void **)&params_input_, sizeof(unsigned int)));
 
-        checkRuntime(cudaMallocManaged((void **)&mask_, mask_size_));
-        checkRuntime(cudaMallocManaged((void **)&voxels_, voxels_size_));
-        checkRuntime(cudaMallocManaged((void **)&voxelsList_, param_.max_points * sizeof(int)));
+        checkRuntime(cudaMalloc((void **)&mask_, mask_size_));
+        checkRuntime(cudaMalloc((void **)&voxels_, voxels_size_));
+        checkRuntime(cudaMalloc((void **)&voxelsList_, param_.max_points * sizeof(int)));
 
         return true;
     }
