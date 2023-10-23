@@ -35,7 +35,7 @@ namespace lidar {
 
 class Backbone {
  public:
-    virtual void forward(const float* features, const unsigned int* voxel_idxs, const unsigned int* params, void* stream = nullptr) = 0;
+    virtual void forward(const nvtype::half* voxels, const unsigned int* voxel_idxs, const unsigned int* params, void* stream = nullptr) = 0;
 
     virtual float* cls() = 0;
     virtual float* box() = 0;

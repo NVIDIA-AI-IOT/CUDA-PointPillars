@@ -130,7 +130,8 @@ std::shared_ptr<pointpillar::lidar::Core> create_core() {
 
     pointpillar::lidar::CoreParameter param;
     param.voxelization = vp;
-    param.lidar_model = "../model/pointpillar.onnx.cache";
+    param.pfe_model = "../model/pfe.plan";
+    param.lidar_model = "../model/backbone.plan";
     param.lidar_post = pp;
     return pointpillar::lidar::create_core(param);
 }

@@ -103,7 +103,7 @@ def simplify_preprocess(onnx_model):
   for i in range(6):
     next_node = [node for node in graph.nodes if node.inputs[0] == current_node.outputs[0]][0]
     if i == 5:              # ReduceMax
-      current_node.attrs['keepdims'] = [0]
+      current_node.attrs['keepdims'] = [1]
       break
     current_node = next_node
 

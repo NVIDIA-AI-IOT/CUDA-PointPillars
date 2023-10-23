@@ -21,37 +21,30 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef __POINTPILLAR_HPP__
-#define __POINTPILLAR_HPP__
+#ifndef __LIDAR_PFE_HPP__
+#define __LIDAR_PFE_HPP__
 
-#include "lidar-voxelization.hpp"
-#include "lidar-pfe.hpp"
-#include "lidar-backbone.hpp"
-#include "lidar-postprocess.hpp"
-#include "nms.hpp"
+#include <memory>
+#include <string>
+#include <vector>
+
+#include "common/dtype.hpp"
 
 namespace pointpillar {
 namespace lidar {
 
-struct CoreParameter {
-    VoxelizationParameter voxelization;
-    std::string pfe_model;
-    std::string lidar_model;
-    PostProcessParameter lidar_post;
-    float nms_thresh = 0.01;
+class PFE {
+ public:
+    virtual void forward(const float* voxels, void* stream = nullptr) = 0;
+
+    virtual nvtype::half* feature() = 0;
+
+    virtual void print() = 0;
 };
 
-class Core {
-    public:
-        virtual std::vector<BoundingBox> forward(const float *lidar_points, int num_points, void *stream) = 0;
-
-        virtual void print() = 0;
-        virtual void set_timer(bool enable) = 0;
-};
-
-std::shared_ptr<Core> create_core(const CoreParameter &param);
+std::shared_ptr<PFE> create_pfe(const std::string& model);
 
 };  // namespace lidar
 };  // namespace pointpillar
 
-#endif  // __POINTPILLAR_HPP__
+#endif  // __LIDAR_PFE_HPP__
