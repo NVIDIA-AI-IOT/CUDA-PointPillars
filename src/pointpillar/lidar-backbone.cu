@@ -63,7 +63,8 @@ public:
     virtual void print() override { engine_->print("Lidar Backbone"); }
 
     virtual void forward(const nvtype::half* voxels, const unsigned int* voxel_idxs, const unsigned int* params, void* stream = nullptr) override {
-        engine_->forward({voxels, voxel_idxs, params, cls_, box_, dir_}, static_cast<cudaStream_t>(stream));
+        cudaStream_t _stream = reinterpret_cast<cudaStream_t>(stream);
+        engine_->forward({voxels, voxel_idxs, params, cls_, box_, dir_}, static_cast<cudaStream_t>(_stream));
     }
 
     virtual float* cls() override { return cls_; }

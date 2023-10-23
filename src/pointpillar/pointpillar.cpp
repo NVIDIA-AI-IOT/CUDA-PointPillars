@@ -27,7 +27,7 @@
 
 #include "common/check.hpp"
 #include "common/timer.hpp"
-
+#include "common/tensor.hpp"
 namespace pointpillar {
 namespace lidar {
 
@@ -171,6 +171,7 @@ public:
     virtual void set_timer(bool enable) override { enable_timer_ = enable; }
 
     virtual void print() override {
+        lidar_pfe_->print();
         lidar_backbone_->print();
     }
 

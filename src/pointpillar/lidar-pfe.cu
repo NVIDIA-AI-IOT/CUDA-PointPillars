@@ -45,7 +45,8 @@ public:
 
         feature_dims_ = engine_->static_dims(1);
         int32_t volumn = std::accumulate(feature_dims_.begin(), feature_dims_.end(), 1, std::multiplies<int32_t>());
-        checkRuntime(cudaMalloc(&feature_, volumn * sizeof(half)));
+        feature_size_ = volumn * sizeof(half);
+        checkRuntime(cudaMalloc(&feature_, feature_size_));
 
         return true;
     }
@@ -53,7 +54,8 @@ public:
     virtual void print() override { engine_->print("Lidar PFE"); }
 
     virtual void forward(const float* voxels, void* stream = nullptr) override {
-        engine_->forward({voxels, feature_}, static_cast<cudaStream_t>(stream));
+        cudaStream_t _stream = reinterpret_cast<cudaStream_t>(stream);
+        engine_->forward({voxels, feature_}, _stream);
     }
 
     virtual nvtype::half* feature() override { return feature_; }
@@ -61,6 +63,7 @@ public:
 private:
     std::shared_ptr<TensorRT::Engine> engine_;
     nvtype::half *feature_ = nullptr;
+    int feature_size_;
     std::vector<int> feature_dims_;
 };
 

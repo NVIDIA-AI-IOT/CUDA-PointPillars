@@ -222,8 +222,6 @@ public:
                                         param_.dir_offset,
                                         _stream
                                         ));
-
-        checkRuntime(cudaStreamSynchronize(_stream));
     }
 
     virtual const float *bndbox() override { return bndbox_; }

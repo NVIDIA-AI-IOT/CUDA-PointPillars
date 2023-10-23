@@ -358,8 +358,6 @@ class VoxelizationImplement : public Voxelization {
                     param_.voxel_size.x, param_.voxel_size.y, param_.voxel_size.z,
                     param_.min_range.x, param_.min_range.y, param_.min_range.z,
                     features_input_, _stream));
-
-        checkRuntime(cudaStreamSynchronize(_stream));
     }
 
     virtual const float *features() override { return features_input_; }
@@ -376,7 +374,6 @@ class VoxelizationImplement : public Voxelization {
         int *voxelsList_ = nullptr;
         float *voxel_features_ = nullptr;
         unsigned int *voxel_num_ = nullptr;
-        unsigned int *pillar_num_ = nullptr;
 
         float *features_input_ = nullptr;
         unsigned int *voxel_idxs_ = nullptr;

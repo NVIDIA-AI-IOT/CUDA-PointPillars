@@ -133,7 +133,7 @@ int PPScatterPlugin::enqueue(const nvinfer1::PluginTensorDesc* inputDesc,
 {
     try
     {
-        int numFeatures = inputDesc[0].dims.d[1];
+        int numFeatures = inputDesc[0].dims.d[2];
         
         nvinfer1::DataType inputType = inputDesc[0].type;
 
