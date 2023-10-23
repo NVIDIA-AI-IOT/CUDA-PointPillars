@@ -53,7 +53,7 @@ public:
 
     virtual void print() override { engine_->print("Lidar PFE"); }
 
-    virtual void forward(const float* voxels, void* stream = nullptr) override {
+    virtual void forward(const nvtype::half* voxels, void* stream = nullptr) override {
         cudaStream_t _stream = reinterpret_cast<cudaStream_t>(stream);
         engine_->forward({voxels, feature_}, _stream);
     }

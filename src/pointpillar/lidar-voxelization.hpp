@@ -43,7 +43,7 @@ class Voxelization {
     // points and voxels must be of half-float device pointer
     virtual void forward(const float *points, int num_points, void *stream = nullptr) = 0;
 
-    virtual const float* features() = 0;
+    virtual const nvtype::half* features() = 0;
     virtual const unsigned int* coords() = 0;
     virtual const unsigned int* params() = 0;
 };

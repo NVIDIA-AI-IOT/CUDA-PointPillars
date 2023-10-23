@@ -35,7 +35,7 @@ namespace lidar {
 
 class PFE {
  public:
-    virtual void forward(const float* voxels, void* stream = nullptr) = 0;
+    virtual void forward(const nvtype::half* voxels, void* stream = nullptr) = 0;
 
     virtual nvtype::half* feature() = 0;
 

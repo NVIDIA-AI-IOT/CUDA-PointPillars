@@ -149,7 +149,7 @@ static __global__ void generateFeatures_kernel(float* voxel_features,
     unsigned int* voxel_num, unsigned int* voxel_idxs, unsigned int *params,
     float voxel_x, float voxel_y, float voxel_z,
     float range_min_x, float range_min_y, float range_min_z,
-    float* features)
+    half* features)
 {
     int pillar_idx = blockIdx.x * WARPS_PER_BLOCK + threadIdx.x/WARP_SIZE;
     int point_idx = threadIdx.x % WARP_SIZE;
@@ -163,7 +163,7 @@ static __global__ void generateFeatures_kernel(float* voxel_features,
     __shared__ float4 pillarSumSM[WARPS_PER_BLOCK];
     __shared__ uint4 idxsSM[WARPS_PER_BLOCK];
     __shared__ int pointsNumSM[WARPS_PER_BLOCK];
-    __shared__ float pillarOutSM[WARPS_PER_BLOCK][WARP_SIZE][FEATURES_SIZE];
+    __shared__ half pillarOutSM[WARPS_PER_BLOCK][WARP_SIZE][FEATURES_SIZE];
 
     if (threadIdx.x < WARPS_PER_BLOCK) {
       pointsNumSM[threadIdx.x] = voxel_num[blockIdx.x * WARPS_PER_BLOCK + threadIdx.x];
@@ -207,18 +207,18 @@ static __global__ void generateFeatures_kernel(float* voxel_features,
 
     //store output
     if (point_idx < pointsNumSM[pillar_idx_inBlock]) {
-      pillarOutSM[pillar_idx_inBlock][point_idx][0] = pillarSM[pillar_idx_inBlock][point_idx].x;
-      pillarOutSM[pillar_idx_inBlock][point_idx][1] = pillarSM[pillar_idx_inBlock][point_idx].y;
-      pillarOutSM[pillar_idx_inBlock][point_idx][2] = pillarSM[pillar_idx_inBlock][point_idx].z;
-      pillarOutSM[pillar_idx_inBlock][point_idx][3] = pillarSM[pillar_idx_inBlock][point_idx].w;
+      pillarOutSM[pillar_idx_inBlock][point_idx][0] = __float2half(pillarSM[pillar_idx_inBlock][point_idx].x);
+      pillarOutSM[pillar_idx_inBlock][point_idx][1] = __float2half(pillarSM[pillar_idx_inBlock][point_idx].y);
+      pillarOutSM[pillar_idx_inBlock][point_idx][2] = __float2half(pillarSM[pillar_idx_inBlock][point_idx].z);
+      pillarOutSM[pillar_idx_inBlock][point_idx][3] = __float2half(pillarSM[pillar_idx_inBlock][point_idx].w);
 
-      pillarOutSM[pillar_idx_inBlock][point_idx][4] = mean.x;
-      pillarOutSM[pillar_idx_inBlock][point_idx][5] = mean.y;
-      pillarOutSM[pillar_idx_inBlock][point_idx][6] = mean.z;
+      pillarOutSM[pillar_idx_inBlock][point_idx][4] = __float2half(mean.x);
+      pillarOutSM[pillar_idx_inBlock][point_idx][5] = __float2half(mean.y);
+      pillarOutSM[pillar_idx_inBlock][point_idx][6] = __float2half(mean.z);
 
-      pillarOutSM[pillar_idx_inBlock][point_idx][7] = center.x;
-      pillarOutSM[pillar_idx_inBlock][point_idx][8] = center.y;
-      pillarOutSM[pillar_idx_inBlock][point_idx][9] = center.z;
+      pillarOutSM[pillar_idx_inBlock][point_idx][7] = __float2half(center.x);
+      pillarOutSM[pillar_idx_inBlock][point_idx][8] = __float2half(center.y);
+      pillarOutSM[pillar_idx_inBlock][point_idx][9] = __float2half(center.z);
 
     } else {
       pillarOutSM[pillar_idx_inBlock][point_idx][0] = 0;
@@ -240,7 +240,7 @@ static __global__ void generateFeatures_kernel(float* voxel_features,
     for(int i = 0; i < FEATURES_SIZE; i ++) {
       int outputSMId = pillar_idx_inBlock*WARP_SIZE*FEATURES_SIZE + i* WARP_SIZE + point_idx;
       int outputId = pillar_idx*WARP_SIZE*FEATURES_SIZE + i* WARP_SIZE + point_idx;
-      features[outputId] = ((float*)pillarOutSM)[outputSMId] ;
+      features[outputId] = ((half*)pillarOutSM)[outputSMId];
     }
 
 }
@@ -260,7 +260,7 @@ cudaError_t generateFeatures_launch(float* voxel_features,
     unsigned int *params, unsigned int max_voxels,
     float voxel_x, float voxel_y, float voxel_z,
     float range_min_x, float range_min_y, float range_min_z,
-    float* features,
+    nvtype::half* features,
     cudaStream_t stream)
 {
     dim3 blocks((max_voxels+WARPS_PER_BLOCK-1)/WARPS_PER_BLOCK);
@@ -273,7 +273,7 @@ cudaError_t generateFeatures_launch(float* voxel_features,
       params,
       voxel_x, voxel_y, voxel_z,
       range_min_x, range_min_y, range_min_z,
-      features);
+      (half *)features);
 
     cudaError_t err = cudaGetLastError();
     return err;
@@ -304,7 +304,7 @@ class VoxelizationImplement : public Voxelization {
         voxel_features_size_ = param_.max_voxels * param_.max_points_per_voxel * 4 * sizeof(float);
         voxel_num_size_ = param_.max_voxels * sizeof(unsigned int);
         voxel_idxs_size_ = param_.max_voxels * 4 * sizeof(unsigned int);
-        features_input_size_ = param_.max_voxels * param_.max_points_per_voxel * 10 * sizeof(float);
+        features_input_size_ = param_.max_voxels * param_.max_points_per_voxel * 10 * sizeof(nvtype::half);
 
         checkRuntime(cudaMallocManaged((void **)&voxel_features_, voxel_features_size_));
         checkRuntime(cudaMallocManaged((void **)&voxel_num_, voxel_num_size_));
@@ -323,7 +323,6 @@ class VoxelizationImplement : public Voxelization {
     // points and voxels must be of half type
     virtual void forward(const float *_points, int num_points, void *stream) override {
         cudaStream_t _stream = reinterpret_cast<cudaStream_t>(stream);
-        // const half *_points = reinterpret_cast<const half *>(points);
 
         checkRuntime(cudaMemsetAsync(voxel_features_, 0, voxel_features_size_, _stream));
         checkRuntime(cudaMemsetAsync(voxel_num_, 0, voxel_num_size_, _stream));
@@ -360,7 +359,7 @@ class VoxelizationImplement : public Voxelization {
                     features_input_, _stream));
     }
 
-    virtual const float *features() override { return features_input_; }
+    virtual const nvtype::half *features() override { return features_input_; }
 
     virtual const unsigned int *coords() override { return voxel_idxs_; }
 
@@ -375,7 +374,7 @@ class VoxelizationImplement : public Voxelization {
         float *voxel_features_ = nullptr;
         unsigned int *voxel_num_ = nullptr;
 
-        float *features_input_ = nullptr;
+        nvtype::half *features_input_ = nullptr;
         unsigned int *voxel_idxs_ = nullptr;
         unsigned int *params_input_ = nullptr;
 
