@@ -99,8 +99,7 @@ void SaveBoxPred(std::vector<pointpillar::lidar::BoundingBox> boxes, std::string
           ofs << box.h << " ";
           ofs << box.rt << " ";
           ofs << box.id << " ";
-          ofs << box.score << " ";
-          ofs << "\n";
+          ofs << box.score << "\n";
         }
     }
     else {

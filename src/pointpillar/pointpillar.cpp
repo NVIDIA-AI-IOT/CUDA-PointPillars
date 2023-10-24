@@ -28,6 +28,7 @@
 #include "common/check.hpp"
 #include "common/timer.hpp"
 #include "common/tensor.hpp"
+
 namespace pointpillar {
 namespace lidar {
 
@@ -91,20 +92,7 @@ public:
         this->lidar_backbone_->forward(this->lidar_pfe_->feature(), this->lidar_voxelization_->coords(), this->lidar_voxelization_->params(), _stream);
         this->lidar_postprocess_->forward(this->lidar_backbone_->cls(), this->lidar_backbone_->box(), this->lidar_backbone_->dir(), _stream);
 
-        float* bndbox_output_ = (float *)this->lidar_postprocess_->bndbox();
-        int num_obj = static_cast<int>(bndbox_output_[0]);
-        auto output = bndbox_output_ + 1;
-
-        for (int i = 0; i < num_obj; i++) {
-            auto Bb = BoundingBox(output[i * 9], output[i * 9 + 1], output[i * 9 + 2], output[i * 9 + 3], output[i * 9 + 4],
-                                output[i * 9 + 5], output[i * 9 + 6], static_cast<int>(output[i * 9 + 7]), output[i * 9 + 8]);
-            res_.push_back(Bb);
-        }
-
-        std::vector<BoundingBox> nms_pred;
-        nms_cpu(res_, param_.nms_thresh, nms_pred);
-        res_.clear();
-        return nms_pred;
+        return this->lidar_postprocess_->bndBoxVec();
     }
 
     std::vector<BoundingBox> forward_timer(const float *lidar_points, int num_points, void *stream) {
@@ -136,28 +124,27 @@ public:
 
         timer_.start(_stream);
         this->lidar_postprocess_->forward(this->lidar_backbone_->cls(), this->lidar_backbone_->box(), this->lidar_backbone_->dir(), _stream);
-        times.emplace_back(timer_.stop("Lidar Decoder"));
+        times.emplace_back(timer_.stop("Lidar Decoder + NMS"));
 
-        timer_.start(_stream);
-        float* bndbox_output_ = (float *)this->lidar_postprocess_->bndbox();
-        int num_obj = static_cast<int>(bndbox_output_[0]);
-        auto output = bndbox_output_ + 1;
+        // timer_.start(_stream);
+        // int num_obj = this->lidar_postprocess_->bndboxNum();
+        // auto output = this->lidar_postprocess_->bndbox();
 
-        for (int i = 0; i < num_obj; i++) {
-            auto Bb = BoundingBox(output[i * 9], output[i * 9 + 1], output[i * 9 + 2], output[i * 9 + 3], output[i * 9 + 4],
-                                output[i * 9 + 5], output[i * 9 + 6], static_cast<int>(output[i * 9 + 7]), output[i * 9 + 8]);
-            res_.push_back(Bb);
-        }
+        // for (int i = 0; i < num_obj; i++) {
+        //     auto Bb = BoundingBox(output[i * 9], output[i * 9 + 1], output[i * 9 + 2], output[i * 9 + 3], output[i * 9 + 4],
+        //                         output[i * 9 + 5], output[i * 9 + 6], static_cast<int>(output[i * 9 + 7]), output[i * 9 + 8]);
+        //     res_.push_back(Bb);
+        // }
 
-        std::vector<BoundingBox> nms_pred;
-        nms_cpu(res_, param_.nms_thresh, nms_pred);
-        res_.clear();
-        times.emplace_back(timer_.stop("NMS"));
+        // std::vector<BoundingBox> nms_pred;
+        // nms_cpu(res_, 0.01, nms_pred);
+        // res_.clear();
+        // times.emplace_back(timer_.stop("NMS"));
 
         float total_time = std::accumulate(times.begin(), times.end(), 0.0f, std::plus<float>{});
         printf("Total: %.3f ms\n", total_time);
         printf("=============================================\n");
-        return nms_pred;
+        return this->lidar_postprocess_->bndBoxVec();
     }
 
     virtual std::vector<BoundingBox> forward(const float *lidar_points, int num_points, void *stream) override {

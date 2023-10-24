@@ -22,6 +22,8 @@
  */
 
 #include "lidar-postprocess.hpp"
+#include <thrust/sort.h>
+#include <thrust/device_ptr.h>
 
 #include <algorithm>
 #include <math.h>
@@ -33,6 +35,15 @@
 namespace pointpillar {
 namespace lidar {
 
+const int NMS_THREADS_PER_BLOCK = sizeof(uint64_t) * 8;
+const int DET_CHANNEL = 9;
+
+typedef struct {
+  float val[DET_CHANNEL];
+} combined_float;
+
+#define DIVUP(x, y) (x + y - 1) / y
+
 __device__ float sigmoid(const float x) { return 1.0f / (1.0f + expf(-x)); }
 
 __global__ void postprocess_kernal(const float *cls_input,
@@ -40,7 +51,8 @@ __global__ void postprocess_kernal(const float *cls_input,
                                         const float *dir_input,
                                         float *anchors,
                                         float *anchor_bottom_heights,
-                                        float *BoundingBox_output,
+                                        float *bndbox_output,
+                                        float *score_output,
                                         int *object_counter,
                                         const float min_x_range,
                                         const float max_x_range,
@@ -113,8 +125,7 @@ __global__ void postprocess_kernal(const float *cls_input,
     yaw = dir_rot + dir_offset + period * dir_label;
 
     int resCount = (int)atomicAdd(object_counter, 1);
-    BoundingBox_output[0] = resCount+1;
-    float *data = BoundingBox_output + 1 + resCount * 9;
+    float *data = bndbox_output + resCount * 9;
     data[0] = box_input[box_offset];
     data[1] = box_input[box_offset + 1];
     data[2] = box_input[box_offset + 2];
@@ -124,6 +135,7 @@ __global__ void postprocess_kernal(const float *cls_input,
     data[6] = yaw;
     data[7] = dev_cls[0];
     data[8] = dev_cls[1];
+    score_output[resCount] = dev_cls[1];
   }
 }
 
@@ -132,7 +144,8 @@ cudaError_t postprocess_launch(const float *cls_input,
                       const float *dir_input,
                       float *anchors,
                       float *anchor_bottom_heights,
-                      float *BoundingBox_output,
+                      float *bndbox_output,
+                      float *score_output,
                       int *object_counter,
                       const float min_x_range,
                       const float max_x_range,
@@ -157,7 +170,8 @@ cudaError_t postprocess_launch(const float *cls_input,
                  dir_input,
                  anchors,
                  anchor_bottom_heights,
-                 BoundingBox_output,
+                 bndbox_output,
+                 score_output,
                  object_counter,
                  min_x_range,
                  max_x_range,
@@ -173,6 +187,218 @@ cudaError_t postprocess_launch(const float *cls_input,
   return cudaGetLastError();
 }
 
+__device__ inline float cross(const float2 p1, const float2 p2, const float2 p0) {
+    return (p1.x - p0.x) * (p2.y - p0.y) - (p2.x - p0.x) * (p1.y - p0.y);
+}
+
+__device__ inline int check_box2d(float const *const box, const float2 p) {
+    const float MARGIN = 1e-2;
+    float center_x = box[0];
+    float center_y = box[1];
+    float angle_cos = cos(-box[6]);
+    float angle_sin = sin(-box[6]);
+    float rot_x = (p.x - center_x) * angle_cos + (p.y - center_y) * (-angle_sin);
+    float rot_y = (p.x - center_x) * angle_sin + (p.y - center_y) * angle_cos;
+
+    return (fabs(rot_x) < box[3] / 2 + MARGIN && fabs(rot_y) < box[4] / 2 + MARGIN);
+}
+
+__device__ inline bool intersection(const float2 p1, const float2 p0, const float2 q1, const float2 q0, float2 &ans) {
+
+    if (( fmin(p0.x, p1.x) <= fmax(q0.x, q1.x) &&
+          fmin(q0.x, q1.x) <= fmax(p0.x, p1.x) &&
+          fmin(p0.y, p1.y) <= fmax(q0.y, q1.y) &&
+          fmin(q0.y, q1.y) <= fmax(p0.y, p1.y) ) == 0)
+        return false;
+
+
+    float s1 = cross(q0, p1, p0);
+    float s2 = cross(p1, q1, p0);
+    float s3 = cross(p0, q1, q0);
+    float s4 = cross(q1, p1, q0);
+
+    if (!(s1 * s2 > 0 && s3 * s4 > 0))
+        return false;
+
+    float s5 = cross(q1, p1, p0);
+    if (fabs(s5 - s1) > 1e-8) {
+        ans.x = (s5 * q0.x - s1 * q1.x) / (s5 - s1);
+        ans.y = (s5 * q0.y - s1 * q1.y) / (s5 - s1);
+
+    } else {
+        float a0 = p0.y - p1.y, b0 = p1.x - p0.x, c0 = p0.x * p1.y - p1.x * p0.y;
+        float a1 = q0.y - q1.y, b1 = q1.x - q0.x, c1 = q0.x * q1.y - q1.x * q0.y;
+        float D = a0 * b1 - a1 * b0;
+
+        ans.x = (b0 * c1 - b1 * c0) / D;
+        ans.y = (a1 * c0 - a0 * c1) / D;
+    }
+
+    return true;
+}
+
+__device__ inline void rotate_around_center(const float2 &center, const float angle_cos, const float angle_sin, float2 &p) {
+    float new_x = (p.x - center.x) * angle_cos + (p.y - center.y) * (-angle_sin) + center.x;
+    float new_y = (p.x - center.x) * angle_sin + (p.y - center.y) * angle_cos + center.y;
+    p = float2 {new_x, new_y};
+    return;
+}
+
+__device__ inline bool devIoU(float const *const box_a, float const *const box_b, const float nms_thresh) {
+    float a_angle = box_a[6], b_angle = box_b[6];
+    float a_dx_half = box_a[3] / 2, b_dx_half = box_b[3] / 2, a_dy_half = box_a[4] / 2, b_dy_half = box_b[4] / 2;
+    float a_x1 = box_a[0] - a_dx_half, a_y1 = box_a[1] - a_dy_half;
+    float a_x2 = box_a[0] + a_dx_half, a_y2 = box_a[1] + a_dy_half;
+    float b_x1 = box_b[0] - b_dx_half, b_y1 = box_b[1] - b_dy_half;
+    float b_x2 = box_b[0] + b_dx_half, b_y2 = box_b[1] + b_dy_half;
+    float2 box_a_corners[5];
+    float2 box_b_corners[5];
+
+    float2 center_a = float2 {box_a[0], box_a[1]};
+    float2 center_b = float2 {box_b[0], box_b[1]};
+
+    float2 cross_points[16];
+    float2 poly_center =  {0, 0};
+    int cnt = 0;
+    bool flag = false;
+
+    box_a_corners[0] = float2 {a_x1, a_y1};
+    box_a_corners[1] = float2 {a_x2, a_y1};
+    box_a_corners[2] = float2 {a_x2, a_y2};
+    box_a_corners[3] = float2 {a_x1, a_y2};
+
+    box_b_corners[0] = float2 {b_x1, b_y1};
+    box_b_corners[1] = float2 {b_x2, b_y1};
+    box_b_corners[2] = float2 {b_x2, b_y2};
+    box_b_corners[3] = float2 {b_x1, b_y2};
+
+    float a_angle_cos = cos(a_angle), a_angle_sin = sin(a_angle);
+    float b_angle_cos = cos(b_angle), b_angle_sin = sin(b_angle);
+
+    for (int k = 0; k < 4; k++) {
+        rotate_around_center(center_a, a_angle_cos, a_angle_sin, box_a_corners[k]);
+        rotate_around_center(center_b, b_angle_cos, b_angle_sin, box_b_corners[k]);
+    }
+
+    box_a_corners[4] = box_a_corners[0];
+    box_b_corners[4] = box_b_corners[0];
+
+    for (int i = 0; i < 4; i++) {
+        for (int j = 0; j < 4; j++) {
+            flag = intersection(box_a_corners[i + 1], box_a_corners[i],
+                                box_b_corners[j + 1], box_b_corners[j],
+                                cross_points[cnt]);
+            if (flag) {
+                poly_center = {poly_center.x + cross_points[cnt].x, poly_center.y + cross_points[cnt].y};
+                cnt++;
+            }
+        }
+    }
+
+    for (int k = 0; k < 4; k++) {
+        if (check_box2d(box_a, box_b_corners[k])) {
+            poly_center = {poly_center.x + box_b_corners[k].x, poly_center.y + box_b_corners[k].y};
+            cross_points[cnt] = box_b_corners[k];
+            cnt++;
+        }
+        if (check_box2d(box_b, box_a_corners[k])) {
+            poly_center = {poly_center.x + box_a_corners[k].x, poly_center.y + box_a_corners[k].y};
+            cross_points[cnt] = box_a_corners[k];
+            cnt++;
+        }
+    }
+
+    poly_center.x /= cnt;
+    poly_center.y /= cnt;
+
+    float2 temp;
+    for (int j = 0; j < cnt - 1; j++) {
+        for (int i = 0; i < cnt - j - 1; i++) {
+            if (atan2(cross_points[i].y - poly_center.y, cross_points[i].x - poly_center.x) >
+                atan2(cross_points[i+1].y - poly_center.y, cross_points[i+1].x - poly_center.x)
+                ) {
+                temp = cross_points[i];
+                cross_points[i] = cross_points[i + 1];
+                cross_points[i + 1] = temp;
+            }
+        }
+    }
+
+    float area = 0;
+    for (int k = 0; k < cnt - 1; k++) {
+        float2 a = {cross_points[k].x - cross_points[0].x,
+                    cross_points[k].y - cross_points[0].y};
+        float2 b = {cross_points[k + 1].x - cross_points[0].x,
+                    cross_points[k + 1].y - cross_points[0].y};
+        area += (a.x * b.y - a.y * b.x);
+    }
+
+    float s_overlap = fabs(area) / 2.0;;
+    float sa = box_a[3] * box_a[4];
+    float sb = box_b[3] * box_b[4];
+    float iou = s_overlap / fmaxf(sa + sb - s_overlap, 1e-8);
+
+    return iou >= nms_thresh;
+}
+
+__global__ void nms_cuda(const int n_boxes, const float iou_threshold, const float *dev_boxes, uint64_t *dev_mask) {
+  const int row_start = blockIdx.y;
+  const int col_start = blockIdx.x;
+  const int tid = threadIdx.x;
+
+  if (row_start > col_start) return;
+
+  const int row_size = fminf(n_boxes - row_start * NMS_THREADS_PER_BLOCK, NMS_THREADS_PER_BLOCK);
+  const int col_size = fminf(n_boxes - col_start * NMS_THREADS_PER_BLOCK, NMS_THREADS_PER_BLOCK);
+
+  __shared__ float block_boxes[NMS_THREADS_PER_BLOCK * 7];
+
+  if (tid < col_size) {
+    int idx = NMS_THREADS_PER_BLOCK * col_start + tid;
+    block_boxes[tid * 7 + 0] = dev_boxes[idx * DET_CHANNEL + 0];
+    block_boxes[tid * 7 + 1] = dev_boxes[idx * DET_CHANNEL + 1];
+    block_boxes[tid * 7 + 2] = dev_boxes[idx * DET_CHANNEL + 2];
+    block_boxes[tid * 7 + 3] = dev_boxes[idx * DET_CHANNEL + 3];
+    block_boxes[tid * 7 + 4] = dev_boxes[idx * DET_CHANNEL + 4];
+    block_boxes[tid * 7 + 5] = dev_boxes[idx * DET_CHANNEL + 5];
+    block_boxes[tid * 7 + 6] = dev_boxes[idx * DET_CHANNEL + 6];
+  }
+  __syncthreads();
+
+  if (tid < row_size) {
+    const int cur_box_idx = NMS_THREADS_PER_BLOCK * row_start + tid;
+    const float *cur_box = dev_boxes + cur_box_idx * DET_CHANNEL;
+    int i = 0;
+    uint64_t t = 0;
+    int start = 0;
+    if (row_start == col_start) {
+      start = tid + 1;
+    }
+    for (i = start; i < col_size; i++) {
+      if (devIoU(cur_box, block_boxes + i * 7, iou_threshold)) {
+        t |= 1ULL << i;
+      }
+    }
+    dev_mask[cur_box_idx * gridDim.y + col_start] = t;
+  }
+}
+
+cudaError_t nms_launch(unsigned int boxes_num,
+               float *boxes,
+               float nms_thresh,
+               uint64_t* mask,
+               cudaStream_t stream)
+{
+    int col_blocks = DIVUP(boxes_num, NMS_THREADS_PER_BLOCK);
+
+    dim3 blocks(col_blocks, col_blocks);
+    dim3 threads(NMS_THREADS_PER_BLOCK);
+
+    nms_cuda<<<blocks, threads, 0, stream>>>(boxes_num, nms_thresh, boxes, mask);
+
+    return cudaGetLastError();
+}
+
 class PostProcessImplement : public PostProcess {
 public:
     virtual ~PostProcessImplement() {
@@ -185,15 +411,20 @@ public:
     virtual bool init(const PostProcessParameter& param) {
         param_ = param;
 
-        bndbox_size_ = (param_.feature_size.x * param_.feature_size.y * param_.num_anchors * 9 + 1) * sizeof(float);
-        checkRuntime(cudaMallocManaged((void **)&bndbox_, bndbox_size_));
-    
+        det_num_ = param_.feature_size.x * param_.feature_size.y * param_.num_anchors;
+        checkRuntime(cudaMalloc((void **)&bndbox_, det_num_ * 9 * sizeof(float)));
+        checkRuntime(cudaMallocHost((void **)&h_bndbox_, det_num_ * 9 * sizeof(float)));
+        checkRuntime(cudaMalloc((void **)&score_, det_num_ * sizeof(float)));
+
         checkRuntime(cudaMalloc((void **)&anchors_, param_.num_anchors * param_.len_per_anchor * sizeof(float)));
         checkRuntime(cudaMalloc((void **)&anchor_bottom_heights_, param_.num_classes * sizeof(float)));
         checkRuntime(cudaMalloc((void **)&object_counter_, sizeof(int)));
 
         checkRuntime(cudaMemcpy(anchors_, param_.anchors, param_.num_anchors * param_.len_per_anchor * sizeof(float), cudaMemcpyDefault));
         checkRuntime(cudaMemcpy(anchor_bottom_heights_, &param_.anchor_bottom_heights, param_.num_classes * sizeof(float), cudaMemcpyDefault));
+
+        h_mask_size_ = det_num_ * DIVUP(det_num_, NMS_THREADS_PER_BLOCK) * sizeof(uint64_t);
+        checkRuntime(cudaMallocHost((void **)&h_mask_, h_mask_size_));
 
         return true;
     }
@@ -202,12 +433,15 @@ public:
         cudaStream_t _stream = static_cast<cudaStream_t>(stream);
 
         checkRuntime(cudaMemsetAsync(object_counter_, 0, sizeof(int), _stream));
+        checkRuntime(cudaMemsetAsync(h_mask_, 0, h_mask_size_, _stream));
+
         checkRuntime(postprocess_launch((float *)cls,
                                         (float *)box,
                                         (float *)dir,
                                         anchors_,
                                         anchor_bottom_heights_,
                                         bndbox_,
+                                        score_,
                                         object_counter_,
                                         param_.min_range.x,
                                         param_.max_range.x,
@@ -222,9 +456,43 @@ public:
                                         param_.dir_offset,
                                         _stream
                                         ));
+        checkRuntime(cudaMemcpyAsync(&bndbox_num_, object_counter_, sizeof(int), cudaMemcpyDeviceToHost, _stream));
+        checkRuntime(cudaStreamSynchronize(_stream));
+
+        thrust::device_ptr<combined_float> thr_bndbox_((combined_float *)bndbox_);
+        thrust::stable_sort_by_key(thrust::cuda::par.on(_stream), score_, score_ + bndbox_num_, thr_bndbox_, thrust::greater<float>());
+        checkRuntime(nms_launch(bndbox_num_, bndbox_, param_.nms_thresh, h_mask_, _stream));
+
+        checkRuntime(cudaMemcpyAsync(h_bndbox_, bndbox_, det_num_ * 9 * sizeof(float), cudaMemcpyDeviceToHost, _stream));
+        checkRuntime(cudaStreamSynchronize(_stream));
+
+        int col_blocks = DIVUP(bndbox_num_, NMS_THREADS_PER_BLOCK);
+        std::vector<uint64_t> remv(col_blocks, 0);
+        std::vector<bool> keep(bndbox_num_, false);
+        bndbox_vec_.clear();
+
+        for (unsigned int i_nms = 0; i_nms < bndbox_num_; i_nms++) {
+            unsigned int nblock = i_nms / NMS_THREADS_PER_BLOCK;
+            unsigned int inblock = i_nms % NMS_THREADS_PER_BLOCK;
+
+            if (!(remv[nblock] & (1ULL << inblock))) {
+                keep[i_nms] = true;
+                bndbox_vec_.push_back(BoundingBox(h_bndbox_[i_nms * 9 + 0], h_bndbox_[i_nms * 9 + 1], h_bndbox_[i_nms * 9 + 2],
+                                                  h_bndbox_[i_nms * 9 + 3], h_bndbox_[i_nms * 9 + 4], h_bndbox_[i_nms * 9 + 5],
+                                                  h_bndbox_[i_nms * 9 + 6], h_bndbox_[i_nms * 9 + 7], h_bndbox_[i_nms * 9 + 8]));
+                uint64_t* p = h_mask_ + i_nms * col_blocks;
+                for (int j_nms = nblock; j_nms < col_blocks; j_nms++) {
+                    remv[j_nms] |= p[j_nms];
+                }
+            }
+        }
     }
 
-    virtual const float *bndbox() override { return bndbox_; }
+    virtual const float *bndBox() override { return bndbox_; }
+
+    virtual int bndBoxNum() override { return bndbox_num_; }
+
+    virtual std::vector<BoundingBox> bndBoxVec() override { return bndbox_vec_; }
 
 private:
     PostProcessParameter param_;
@@ -233,7 +501,15 @@ private:
     int *object_counter_;
 
     float *bndbox_ = nullptr;
-    unsigned int bndbox_size_ = 0;
+    float *h_bndbox_ = nullptr;
+    float *score_ = nullptr;
+    unsigned int det_num_ = 0;
+
+    uint64_t* h_mask_ = nullptr;
+    unsigned int h_mask_size_ = 0;
+
+    unsigned int bndbox_num_ = 0;
+    std::vector<BoundingBox> bndbox_vec_;
 };
 
 std::shared_ptr<PostProcess> create_postprocess(const PostProcessParameter& param) {

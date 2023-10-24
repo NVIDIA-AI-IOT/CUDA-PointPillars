@@ -28,7 +28,7 @@
 #include "lidar-pfe.hpp"
 #include "lidar-backbone.hpp"
 #include "lidar-postprocess.hpp"
-#include "nms.hpp"
+// #include "nms.hpp"
 
 namespace pointpillar {
 namespace lidar {
@@ -38,7 +38,6 @@ struct CoreParameter {
     std::string pfe_model;
     std::string lidar_model;
     PostProcessParameter lidar_post;
-    float nms_thresh = 0.01;
 };
 
 class Core {

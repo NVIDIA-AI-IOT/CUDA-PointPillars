@@ -25,10 +25,26 @@
 #define __LIDAR_POSTPROCESS_HPP__
 
 #include <memory>
+#include <vector>
 #include "common/dtype.hpp"
 
 namespace pointpillar {
 namespace lidar {
+
+struct BoundingBox {
+    float x;
+    float y;
+    float z;
+    float w;
+    float l;
+    float h;
+    float rt;
+    int id;
+    float score;
+    BoundingBox(){};
+    BoundingBox(float x_, float y_, float z_, float w_, float l_, float h_, float rt_, int id_, float score_)
+        : x(x_), y(y_), z(z_), w(w_), l(l_), h(h_), rt(rt_), id(id_), score(score_) {}
+};
 
 struct PostProcessParameter {
     nvtype::Float3 min_range;
@@ -49,13 +65,18 @@ struct PostProcessParameter {
     int num_box_values = 7;
     float score_thresh = 0.1;
     float dir_offset = 0.78539;
+    float nms_thresh = 0.01;
 };
 
 class PostProcess {
     public:
         virtual void forward(const float* cls, const float* box, const float* dir, void* stream) = 0;
 
-        virtual const float* bndbox() = 0;
+        virtual const float* bndBox() = 0;
+
+        virtual int bndBoxNum() = 0;
+
+        virtual std::vector<BoundingBox> bndBoxVec() = 0;
 };
 
 std::shared_ptr<PostProcess> create_postprocess(const PostProcessParameter& param);

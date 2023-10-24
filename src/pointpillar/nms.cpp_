@@ -181,8 +181,8 @@ inline float box_overlap(const BoundingBox &box_a, const BoundingBox &box_b) {
 
 int nms_cpu(std::vector<BoundingBox> BoundingBoxes, const float nms_thresh, std::vector<BoundingBox> &nms_pred)
 {
-    std::sort(BoundingBoxes.begin(), BoundingBoxes.end(),
-              [](BoundingBox boxes1, BoundingBox boxes2) { return boxes1.score > boxes2.score; });
+    // std::sort(BoundingBoxes.begin(), BoundingBoxes.end(),
+    //           [](BoundingBox boxes1, BoundingBox boxes2) { return boxes1.score > boxes2.score; });
     std::vector<int> suppressed(BoundingBoxes.size(), 0);
     for (size_t i = 0; i < BoundingBoxes.size(); i++) {
         if (suppressed[i] == 1) {
