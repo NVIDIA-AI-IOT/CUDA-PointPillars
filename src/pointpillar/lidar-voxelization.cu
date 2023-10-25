@@ -317,6 +317,16 @@ class VoxelizationImplement : public Voxelization {
         checkRuntime(cudaMalloc((void **)&voxels_, voxels_size_));
         checkRuntime(cudaMalloc((void **)&voxelsList_, param_.max_points * sizeof(int)));
 
+        checkRuntime(cudaMemset(voxel_features_, 0, voxel_features_size_));
+        checkRuntime(cudaMemset(voxel_num_, 0, voxel_num_size_));
+
+        checkRuntime(cudaMemset(mask_, 0, mask_size_));
+        checkRuntime(cudaMemset(voxels_, 0, voxels_size_));
+        checkRuntime(cudaMemset(voxelsList_, 0, param_.max_points * sizeof(int)));
+
+        checkRuntime(cudaMemset(features_input_, 0, features_input_size_));
+        checkRuntime(cudaMemset(voxel_idxs_, 0, voxel_idxs_size_));
+
         return true;
     }
 
@@ -324,15 +334,6 @@ class VoxelizationImplement : public Voxelization {
     virtual void forward(const float *_points, int num_points, void *stream) override {
         cudaStream_t _stream = reinterpret_cast<cudaStream_t>(stream);
 
-        checkRuntime(cudaMemsetAsync(voxel_features_, 0, voxel_features_size_, _stream));
-        checkRuntime(cudaMemsetAsync(voxel_num_, 0, voxel_num_size_, _stream));
-
-        checkRuntime(cudaMemsetAsync(mask_, 0, mask_size_, _stream));
-        checkRuntime(cudaMemsetAsync(voxels_, 0, voxels_size_, _stream));
-        checkRuntime(cudaMemsetAsync(voxelsList_, 0, param_.max_points * sizeof(int), _stream));
-
-        checkRuntime(cudaMemsetAsync(features_input_, 0, features_input_size_, _stream));
-        checkRuntime(cudaMemsetAsync(voxel_idxs_, 0, voxel_idxs_size_, _stream));
         checkRuntime(cudaMemsetAsync(params_input_, 0, sizeof(unsigned int), _stream));
 
         checkRuntime(generateVoxels_random_launch(_points, num_points,

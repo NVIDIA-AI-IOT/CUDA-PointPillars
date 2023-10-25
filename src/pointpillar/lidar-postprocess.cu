@@ -463,7 +463,7 @@ public:
         thrust::stable_sort_by_key(thrust::cuda::par.on(_stream), score_, score_ + bndbox_num_, thr_bndbox_, thrust::greater<float>());
         checkRuntime(nms_launch(bndbox_num_, bndbox_, param_.nms_thresh, h_mask_, _stream));
 
-        checkRuntime(cudaMemcpyAsync(h_bndbox_, bndbox_, det_num_ * 9 * sizeof(float), cudaMemcpyDeviceToHost, _stream));
+        checkRuntime(cudaMemcpyAsync(h_bndbox_, bndbox_, bndbox_num_ * 9 * sizeof(float), cudaMemcpyDeviceToHost, _stream));
         checkRuntime(cudaStreamSynchronize(_stream));
 
         int col_blocks = DIVUP(bndbox_num_, NMS_THREADS_PER_BLOCK);
