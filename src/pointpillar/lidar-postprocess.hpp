@@ -72,10 +72,6 @@ class PostProcess {
     public:
         virtual void forward(const float* cls, const float* box, const float* dir, void* stream) = 0;
 
-        virtual const float* bndBox() = 0;
-
-        virtual int bndBoxNum() = 0;
-
         virtual std::vector<BoundingBox> bndBoxVec() = 0;
 };
 

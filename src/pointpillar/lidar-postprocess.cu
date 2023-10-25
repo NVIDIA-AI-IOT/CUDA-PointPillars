@@ -77,7 +77,6 @@ __global__ void postprocess_kernal(const float *cls_input,
   float x_offset = min_x_range + col * (max_x_range - min_x_range) / (feature_x_size - 1);
   float y_offset = min_y_range + row * (max_y_range - min_y_range) / (feature_y_size - 1);
   int cls_offset = loc_index * num_anchors * num_classes + ith_anchor * num_classes;
-  float dev_cls[2] = {-1, 0};
 
   const float *scores = cls_input + cls_offset;
   float max_score = sigmoid(scores[0]);
@@ -89,10 +88,8 @@ __global__ void postprocess_kernal(const float *cls_input,
       cls_id = i;
     }
   }
-  dev_cls[0] = static_cast<float>(cls_id);
-  dev_cls[1] = max_score;
 
-  if (dev_cls[1] >= score_thresh)
+  if (max_score >= score_thresh)
   {
     int box_offset = loc_index * num_anchors * num_box_values + ith_anchor * num_box_values;
     int dir_cls_offset = loc_index * num_anchors * 2 + ith_anchor * 2;
@@ -133,9 +130,9 @@ __global__ void postprocess_kernal(const float *cls_input,
     data[4] = box_input[box_offset + 4];
     data[5] = box_input[box_offset + 5];
     data[6] = yaw;
-    data[7] = dev_cls[0];
-    data[8] = dev_cls[1];
-    score_output[resCount] = dev_cls[1];
+    *(int *)&data[7] = cls_id;
+    data[8] = max_score;
+    score_output[resCount] = max_score;
   }
 }
 
@@ -403,9 +400,14 @@ class PostProcessImplement : public PostProcess {
 public:
     virtual ~PostProcessImplement() {
         if (bndbox_) checkRuntime(cudaFree(bndbox_));
+        if (h_bndbox_) checkRuntime(cudaFreeHost(h_bndbox_));
+        if (score_) checkRuntime(cudaFree(score_));
+
         if (anchors_) checkRuntime(cudaFree(anchors_));
         if (anchor_bottom_heights_) checkRuntime(cudaFree(anchor_bottom_heights_));
         if (object_counter_) checkRuntime(cudaFree(object_counter_));
+
+        if (h_mask_) checkRuntime(cudaFreeHost(h_mask_));
     }
 
     virtual bool init(const PostProcessParameter& param) {
@@ -425,6 +427,10 @@ public:
 
         h_mask_size_ = det_num_ * DIVUP(det_num_, NMS_THREADS_PER_BLOCK) * sizeof(uint64_t);
         checkRuntime(cudaMallocHost((void **)&h_mask_, h_mask_size_));
+
+        int res_blocks = DIVUP(det_num_, NMS_THREADS_PER_BLOCK);
+        remv_ = std::vector<uint64_t>(res_blocks, 0);
+        bndbox_after_nms_.resize(det_num_);
 
         return true;
     }
@@ -467,32 +473,27 @@ public:
         checkRuntime(cudaStreamSynchronize(_stream));
 
         int col_blocks = DIVUP(bndbox_num_, NMS_THREADS_PER_BLOCK);
-        std::vector<uint64_t> remv(col_blocks, 0);
-        std::vector<bool> keep(bndbox_num_, false);
-        bndbox_vec_.clear();
+        memset(remv_.data(), 0, col_blocks * sizeof(uint64_t));
+        bndbox_num_after_nms_ = 0;
 
         for (unsigned int i_nms = 0; i_nms < bndbox_num_; i_nms++) {
             unsigned int nblock = i_nms / NMS_THREADS_PER_BLOCK;
             unsigned int inblock = i_nms % NMS_THREADS_PER_BLOCK;
 
-            if (!(remv[nblock] & (1ULL << inblock))) {
-                keep[i_nms] = true;
-                bndbox_vec_.push_back(BoundingBox(h_bndbox_[i_nms * 9 + 0], h_bndbox_[i_nms * 9 + 1], h_bndbox_[i_nms * 9 + 2],
-                                                  h_bndbox_[i_nms * 9 + 3], h_bndbox_[i_nms * 9 + 4], h_bndbox_[i_nms * 9 + 5],
-                                                  h_bndbox_[i_nms * 9 + 6], h_bndbox_[i_nms * 9 + 7], h_bndbox_[i_nms * 9 + 8]));
+            if (!(remv_[nblock] & (1ULL << inblock))) {
+                bndbox_after_nms_[bndbox_num_after_nms_] = *(BoundingBox*)(&h_bndbox_[i_nms * 9]);
+                bndbox_num_after_nms_++;
                 uint64_t* p = h_mask_ + i_nms * col_blocks;
                 for (int j_nms = nblock; j_nms < col_blocks; j_nms++) {
-                    remv[j_nms] |= p[j_nms];
+                    remv_[j_nms] |= p[j_nms];
                 }
             }
         }
     }
 
-    virtual const float *bndBox() override { return bndbox_; }
-
-    virtual int bndBoxNum() override { return bndbox_num_; }
-
-    virtual std::vector<BoundingBox> bndBoxVec() override { return bndbox_vec_; }
+    virtual std::vector<BoundingBox> bndBoxVec() override {
+        return std::vector<BoundingBox>(bndbox_after_nms_.begin(), bndbox_after_nms_.begin() + bndbox_num_after_nms_);
+    }
 
 private:
     PostProcessParameter param_;
@@ -507,9 +508,11 @@ private:
 
     uint64_t* h_mask_ = nullptr;
     unsigned int h_mask_size_ = 0;
+    std::vector<uint64_t> remv_;
 
     unsigned int bndbox_num_ = 0;
-    std::vector<BoundingBox> bndbox_vec_;
+    std::vector<BoundingBox> bndbox_after_nms_;
+    unsigned int bndbox_num_after_nms_ = 0;
 };
 
 std::shared_ptr<PostProcess> create_postprocess(const PostProcessParameter& param) {

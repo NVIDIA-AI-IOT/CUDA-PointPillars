@@ -126,21 +126,6 @@ public:
         this->lidar_postprocess_->forward(this->lidar_backbone_->cls(), this->lidar_backbone_->box(), this->lidar_backbone_->dir(), _stream);
         times.emplace_back(timer_.stop("Lidar Decoder + NMS"));
 
-        // timer_.start(_stream);
-        // int num_obj = this->lidar_postprocess_->bndboxNum();
-        // auto output = this->lidar_postprocess_->bndbox();
-
-        // for (int i = 0; i < num_obj; i++) {
-        //     auto Bb = BoundingBox(output[i * 9], output[i * 9 + 1], output[i * 9 + 2], output[i * 9 + 3], output[i * 9 + 4],
-        //                         output[i * 9 + 5], output[i * 9 + 6], static_cast<int>(output[i * 9 + 7]), output[i * 9 + 8]);
-        //     res_.push_back(Bb);
-        // }
-
-        // std::vector<BoundingBox> nms_pred;
-        // nms_cpu(res_, 0.01, nms_pred);
-        // res_.clear();
-        // times.emplace_back(timer_.stop("NMS"));
-
         float total_time = std::accumulate(times.begin(), times.end(), 0.0f, std::plus<float>{});
         printf("Total: %.3f ms\n", total_time);
         printf("=============================================\n");
