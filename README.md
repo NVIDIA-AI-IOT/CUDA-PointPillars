@@ -5,10 +5,9 @@ The model is created with [OpenPCDet](https://github.com/open-mmlab/OpenPCDet) a
 
 Overall inference has four phases:
 
-- Convert points cloud into 4-channle voxels
-- Extend 4-channel voxels to 10-channel voxel features
-- Run TensorRT engine to get 3D-detection raw data
-- Parse bounding box, class type and direction
+- Voxelize points cloud into 10-channel features
+- Run TensorRT engine to get detection feature
+- Parse detection feature and apply NMS
 
 ## Model && Data
 
@@ -57,32 +56,29 @@ cd build && ./pointpillar
 
 #### Performance in FP16
 
-Set Jetson to power mode with "sudo nvpmodel -m 0 && sudo jetson_clocks"
+Average perf in FP16 on the training set of KITTI dataset.
 
 ```
-| Function(unit:ms) | Xavier | Orin   |
-| ----------------- | ------ | ------ |
-| GenerateVoxels    | 0.29   | 0.14   |
-| GenerateFeatures  | 0.31   | 0.15   |
-| Inference         | 20.21  | 9.12   |
-| Postprocessing    | 3.38   | 1.77   |
-| Overall           | 24.19  | 11.18  |
+| Function(unit:ms) | Orin   |
+| ----------------- | ------ |
+| Voxelization      | 0.13   |
+| Backbone & Head   | 5.99   |
+| Decoder & NMS     | 1.64   |
+| Overall           | 7.76   |
 ```
 
-3D detection performance of moderate difficulty on the val set of KITTI dataset.
+3D detection performance of moderate difficulty on the validation set of KITTI dataset.
 
 ```
 |                   | Car@R11 | Pedestrian@R11 | Cyclist@R11  | 
 | ----------------- | --------| -------------- | ------------ |
-| CUDA-PointPillars | 77.02   | 51.65          | 62.24        |
+| CUDA-PointPillars | 77.01   | 52.08          | 62.57        |
 | OpenPCDet         | 77.28   | 52.29          | 62.68        |
 ```
 
 ## Note
 
-- GenerateVoxels has random output since GPU processes all points simultaneously while points selection for a voxel is random.
-- The demo will cache the onnx file to improve performance. If a new onnx will be used, please remove the cache file in "./model".
-- MAX_VOXELS in params.h is used to allocate cache during inference. Decrease the value to save memory.
+- Voxelization has random output since GPU processes all points simultaneously while points selection for a voxel is random.
 
 ## References
 
