@@ -92,7 +92,7 @@ def _read_imageset_file(path):
     return [int(line) for line in lines]
 
 def createNVOutput():
-    val_image_ids = _read_imageset_file('./val.txt')
+    val_image_ids = _read_imageset_file('tool/eval/val.txt')
     for image_i in val_image_ids:
         str_i = str(image_i).zfill(6)
 
@@ -177,7 +177,7 @@ def createNVOutput():
                 the_file.write("\n")
 
 def createPCDetOutput():
-    with open("./pcdet.pkl", "rb") as f:
+    with open("tool/eval/pcdet.pkl", "rb") as f:
         dt_annos = pickle.load(f)
         for txt_i in range(0, len(dt_annos)):
             frame = dt_annos[txt_i]
