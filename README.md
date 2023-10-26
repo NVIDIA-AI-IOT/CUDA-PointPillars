@@ -30,7 +30,7 @@ For model exporting, please run the following command to clone pcdet repo and in
 git clone https://github.com/open-mmlab/OpenPCDet.git
 cd OpenPCDet && git checkout 846cf3e && python3 setup.py develop
 ```
-Use below command to export ONNX model:
+Download [PTM](https://drive.google.com/file/d/1wMxWTpU1qUoY3DsCH31WJmvJxcjFXKlm/view) to ckpts/, then use below command to export ONNX model:
 ```
 python3 tool/export_onnx.py --ckpt ckpts/pointpillar_7728.pth --out_dir model
 ```
