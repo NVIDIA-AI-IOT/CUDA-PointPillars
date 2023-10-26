@@ -25,10 +25,10 @@
 namespace pointpillar {
 namespace lidar {
 
-const int POINTS_PER_VOXEL = 32;      // depends on "params.h"
-const int WARP_SIZE = 32;             // one warp(32 threads) for one pillar
-const int WARPS_PER_BLOCK = 4;        // four warp for one block
-const int FEATURES_SIZE = 10;         // features maps number depands on "params.h"
+const int POINTS_PER_VOXEL = 32;
+const int WARP_SIZE = 32;
+const int WARPS_PER_BLOCK = 4;
+const int FEATURES_SIZE = 10;
 
 static __global__ void generateVoxels_random_kernel(const float *points, size_t points_size,
         float min_x_range, float max_x_range,

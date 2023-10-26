@@ -19,8 +19,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-const int PILLARS_PER_BLOCK = 64;     // one thread deals with one pillar and a block has PILLARS_PER_BLOCK threads
-const int PILLAR_FEATURE_SIZE = 64;   // feature count for one pillar depands on "params.h"
+const int PILLARS_PER_BLOCK = 64;
+const int PILLAR_FEATURE_SIZE = 64;
 
 __global__ void pillarScatterHalfkernel(const half *pillar_features_data,
                                         const unsigned int *coords_data, const unsigned int *params_data,

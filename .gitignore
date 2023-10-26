@@ -1,7 +1,8 @@
 build
-eval
+ckpts
 data
-backup
+model/pointpillar.onnx
+model/pointpillar_raw.onnx
+model/*.plan
 workspace
-.idea
 **/__pycache__

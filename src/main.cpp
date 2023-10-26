@@ -21,15 +21,12 @@
 #include <iostream>
 #include <sstream>
 #include <fstream>
+#include <dirent.h>
 
 #include "pointpillar.hpp"
 #include "common/check.hpp"
 
-std::string Data_File = "../data/";
-std::string Save_Dir = "../eval/kitti/object/pred_velo/";
-std::string Model_File = "../model/pointpillar.onnx";
-
-void Getinfo(void)
+void GetDeviceInfo(void)
 {
   cudaDeviceProp prop;
 
@@ -52,37 +49,61 @@ void Getinfo(void)
   printf("\n");
 }
 
+bool hasEnding(std::string const &fullString, std::string const &ending)
+{
+    if (fullString.length() >= ending.length()) {
+        return (0 == fullString.compare (fullString.length() - ending.length(), ending.length(), ending));
+    } else {
+        return false;
+    }
+}
+
+int getFolderFile(const char *path, std::vector<std::string>& files, const char *suffix = ".bin")
+{
+    DIR *dir;
+    struct dirent *ent;
+    if ((dir = opendir(path)) != NULL) {
+        while ((ent = readdir (dir)) != NULL) {
+            std::string file = ent->d_name;
+            if(hasEnding(file, suffix)){
+                files.push_back(file.substr(0, file.length()-4));
+            }
+        }
+        closedir(dir);
+    } else {
+        printf("No such folder: %s.", path);
+        exit(EXIT_FAILURE);
+    }
+    return EXIT_SUCCESS;
+}
+
 int loadData(const char *file, void **data, unsigned int *length)
 {
-  std::fstream dataFile(file, std::ifstream::in);
+    std::fstream dataFile(file, std::ifstream::in);
 
-  if (!dataFile.is_open())
-  {
-	  std::cout << "Can't open files: "<< file<<std::endl;
-	  return -1;
-  }
+    if (!dataFile.is_open()) {
+        std::cout << "Can't open files: "<< file<<std::endl;
+        return -1;
+    }
 
-  //get length of file:
-  unsigned int len = 0;
-  dataFile.seekg (0, dataFile.end);
-  len = dataFile.tellg();
-  dataFile.seekg (0, dataFile.beg);
+    unsigned int len = 0;
+    dataFile.seekg (0, dataFile.end);
+    len = dataFile.tellg();
+    dataFile.seekg (0, dataFile.beg);
 
-  //allocate memory:
-  char *buffer = new char[len];
-  if(buffer==NULL) {
-	  std::cout << "Can't malloc buffer."<<std::endl;
+    char *buffer = new char[len];
+    if (buffer==NULL) {
+        std::cout << "Can't malloc buffer."<<std::endl;
+        dataFile.close();
+        exit(EXIT_FAILURE);
+    }
+
+    dataFile.read(buffer, len);
     dataFile.close();
-	  exit(-1);
-  }
 
-  //read data as a block:
-  dataFile.read(buffer, len);
-  dataFile.close();
-
-  *data = (void*)buffer;
-  *length = len;
-  return 0;  
+    *data = (void*)buffer;
+    *length = len;
+    return 0;  
 }
 
 void SaveBoxPred(std::vector<pointpillar::lidar::BoundingBox> boxes, std::string file_name)
@@ -135,32 +156,70 @@ std::shared_ptr<pointpillar::lidar::Core> create_core() {
     return pointpillar::lidar::create_core(param);
 }
 
+static bool startswith(const char *s, const char *with, const char **last)
+{
+    while (*s++ == *with++)
+    {
+        if (*s == 0 || *with == 0)
+            break;
+    }
+    if (*with == 0)
+        *last = s + 1;
+    return *with == 0;
+}
+
+static void help()
+{
+    printf(
+        "Usage: \n"
+        "    ./pointpillar in/ out/ --timer\n"
+        "    Run pointpillar inference with .bin under in, save .text under out\n"
+        "    Optional: --timer, enable timer log\n"
+    );
+    exit(EXIT_SUCCESS);
+}
+
 int main(int argc, char** argv) {
-    Getinfo();
+
+    if (argc < 3 || argc > 4)
+        help();
+
+    const char *in_dir  = argv[1];
+    const char *out_dir  = argv[2];
+
+    const char *value = nullptr;
+    bool timer = false;
+
+    if (argc == 4) {
+        if (startswith(argv[3], "--timer", &value)) {
+            timer = true;
+        }
+    }
+
+    GetDeviceInfo();
+
+    std::vector<std::string> files;
+    getFolderFile(in_dir, files);
+    std::cout << "Total " << files.size() << std::endl;
 
     auto core = create_core();
     if (core == nullptr) {
-      printf("Core has been failed.\n");
-      return -1;
+        printf("Core has been failed.\n");
+        return -1;
     }
 
     cudaStream_t stream;
     cudaStreamCreate(&stream);
   
     core->print();
-    core->set_timer(true);
+    core->set_timer(timer);
 
-    for (int i = 0; i < 10; i++)
+    for (const auto & file : files)
     {
-        std::string dataFile = Data_File;
-        std::stringstream ss; ss << i;
-        std::string _str = ss.str();
-        std::string index_str = std::string(6 - _str.length(), '0') + _str;
-        dataFile += index_str;
-        dataFile +=".bin";
+        std::string dataFile = std::string(in_dir) + file + ".bin";
 
-        std::cout << "<<<<<<<<<<<" <<std::endl;
-        std::cout << "load file: "<< dataFile <<std::endl;
+        std::cout << "\n<<<<<<<<<<<" <<std::endl;
+        std::cout << "Load file: "<< dataFile <<std::endl;
 
         //load points cloud
         unsigned int length = 0;
@@ -168,17 +227,16 @@ int main(int argc, char** argv) {
         std::shared_ptr<char> buffer((char *)data, std::default_delete<char[]>());
         loadData(dataFile.data(), &data, &length);
         buffer.reset((char *)data);
-        float* points = (float*)buffer.get();
         int points_size = length/sizeof(float)/4;
-        std::cout << "find points num: "<< points_size <<std::endl;
+        std::cout << "Lidar points count: "<< points_size <<std::endl;
     
-        auto bboxes = core->forward(points, points_size, stream);
-        std::cout<<"Bndbox objs: "<< bboxes.size()<<std::endl;
+        auto bboxes = core->forward((float *)buffer.get(), points_size, stream);
+        std::cout<<"Detections after NMS: "<< bboxes.size()<<std::endl;
 
-        std::string save_file_name = Save_Dir + index_str + ".txt";
+        std::string save_file_name = std::string(out_dir) + file + ".txt";
         SaveBoxPred(bboxes, save_file_name);
 
-        std::cout << ">>>>>>>>>>>" <<std::endl;
+        std::cout << ">>>>>>>>>>>" << std::endl;
     }
 
     checkRuntime(cudaStreamDestroy(stream));

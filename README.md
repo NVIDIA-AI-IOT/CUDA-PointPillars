@@ -17,22 +17,42 @@ The onnx file can be converted from [pre-trained model](https://drive.google.com
 
 ### Prerequisites
 
-To build the pointpillars inference, **TensorRT** with PillarScatter layer and **CUDA** are needed. PillarScatter layer plugin is already implemented as a plugin for TRT in the demo.
+We provide a [Dockerfile](docker/Dockerfile) to ease environment setup. Please execute the following command to build the docker image after nvidia-docker installation:
+```
+cd docker && docker build . -t pointpillar
+```
+We can then run the docker with the following command: 
+```
+nvidia-docker run --rm -ti -v /home/$USER/:/home/$USER/ --net=host --rm pointpillar:latest
+```
+For model exporting, please run the following command to clone pcdet repo and install custom CUDA extensions:
+```
+git clone https://github.com/open-mmlab/OpenPCDet.git
+cd OpenPCDet && git checkout 846cf3e && python3 setup.py develop
+```
+Use below command to export ONNX model:
+```
+python3 tool/export_onnx.py --ckpt ckpts/pointpillar_7728.pth --out_dir model
+```
+Use below command to evaluate on kitti dataset:
+```
+sh tool/evaluate_kitti_val.sh
+```
 
 ## Environments
 
-- Nvidia Jetson Xavier/Orin + Jetpack 5.0
-- CUDA 11.4 + cuDNN 8.3.2 + TensorRT 8.4.0
+- Nvidia Jetson Orin + CUDA 11.4 + cuDNN 8.9.0 + TensorRT 8.6.11
 
 ### Compile && Run
 
 ```shell
-$ sudo apt-get install git-lfs
-$ git lfs install
-$ git clone https://github.com/NVIDIA-AI-IOT/CUDA-PointPillars.git && cd CUDA-PointPillars
-$ mkdir build && cd build
-$ cmake .. && make -j$(nproc)
-$ ./demo
+sudo apt-get install git-lfs && git lfs install
+git clone https://github.com/NVIDIA-AI-IOT/CUDA-PointPillars.git
+cd CUDA-PointPillars && mkdir build
+. tool/environment.sh && cd build
+cmake .. && make -j$(nproc)
+cd ../ && sh tool/build_trt_engine.sh
+cd build && ./pointpillar
 ```
 
 #### Performance in FP16
