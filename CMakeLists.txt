@@ -35,7 +35,6 @@ set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}
 include_directories(
     $ENV{CUDA_Inc}
     $ENV{TensorRT_Inc}
-	../libraries/cuOSD/src
     src
 	src/pointpillar
 )
