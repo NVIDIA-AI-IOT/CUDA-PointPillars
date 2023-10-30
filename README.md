@@ -3,18 +3,15 @@
 This repository contains sources and model for [pointpillars](https://arxiv.org/abs/1812.05784) inference using TensorRT.
 The model is created with [OpenPCDet](https://github.com/open-mmlab/OpenPCDet) and modified with onnx_graphsurgeon.
 
-Overall inference has four phases:
+Overall inference has below phases:
 
 - Voxelize points cloud into 10-channel features
 - Run TensorRT engine to get detection feature
 - Parse detection feature and apply NMS
 
-## Model && Data
+## Prerequisites
 
-The demo use the velodyne data from KITTI Dataset.
-The onnx file can be converted from [pre-trained model](https://drive.google.com/file/d/1wMxWTpU1qUoY3DsCH31WJmvJxcjFXKlm/view) with given script under "./tool".
-
-### Prerequisites
+### Prepare Model && Evaluation Environment
 
 We provide a [Dockerfile](docker/Dockerfile) to ease environment setup. Please execute the following command to build the docker image after nvidia-docker installation:
 ```
@@ -33,30 +30,30 @@ Download [PTM](https://drive.google.com/file/d/1wMxWTpU1qUoY3DsCH31WJmvJxcjFXKlm
 ```
 python3 tool/export_onnx.py --ckpt ckpts/pointpillar_7728.pth --out_dir model
 ```
-Use below command to evaluate on kitti dataset:
+Use below command to evaluate on kitti dataset, follow [Evaluation on Kitti] to get more detail for dataset preparation.
 ```
 sh tool/evaluate_kitti_val.sh
 ```
 
-## Environments
+### Set Up Runtime Environments
 
 - Nvidia Jetson Orin + CUDA 11.4 + cuDNN 8.9.0 + TensorRT 8.6.11
 
-### Compile && Run
+## Compile && Run
 
 ```shell
 sudo apt-get install git-lfs && git lfs install
 git clone https://github.com/NVIDIA-AI-IOT/CUDA-PointPillars.git
-cd CUDA-PointPillars && mkdir build
-. tool/environment.sh && cd build
+cd CUDA-PointPillars && . tool/environment.sh
+mkdir build && cd build
 cmake .. && make -j$(nproc)
 cd ../ && sh tool/build_trt_engine.sh
 cd build && ./pointpillar
 ```
 
-#### Performance in FP16
+## FP16 Performance && Metrics
 
-Average perf in FP16 on the training set of KITTI dataset.
+Average perf in FP16 on the training set(7481 instances) of KITTI dataset.
 
 ```
 | Function(unit:ms) | Orin   |
@@ -67,7 +64,7 @@ Average perf in FP16 on the training set of KITTI dataset.
 | Overall           | 7.76   |
 ```
 
-3D detection performance of moderate difficulty on the validation set of KITTI dataset.
+3D moderate metrics on the validation set(3769 instances) of KITTI dataset.
 
 ```
 |                   | Car@R11 | Pedestrian@R11 | Cyclist@R11  | 
