@@ -1,7 +1,6 @@
 # PointPillars Inference with TensorRT
 
 This repository contains sources and model for [pointpillars](https://arxiv.org/abs/1812.05784) inference using TensorRT.
-The model is created with [OpenPCDet](https://github.com/open-mmlab/OpenPCDet) and modified with onnx_graphsurgeon.
 
 Overall inference has below phases:
 
@@ -11,7 +10,7 @@ Overall inference has below phases:
 
 ## Prerequisites
 
-### Prepare Model && Evaluation Environment
+### Prepare Model && Data
 
 We provide a [Dockerfile](docker/Dockerfile) to ease environment setup. Please execute the following command to build the docker image after nvidia-docker installation:
 ```
@@ -30,12 +29,12 @@ Download [PTM](https://drive.google.com/file/d/1wMxWTpU1qUoY3DsCH31WJmvJxcjFXKlm
 ```
 python3 tool/export_onnx.py --ckpt ckpts/pointpillar_7728.pth --out_dir model
 ```
-Use below command to evaluate on kitti dataset, follow [Evaluation on Kitti] to get more detail for dataset preparation.
+Use below command to evaluate on kitti dataset, follow [Evaluation on Kitti](tool/eval/README.md) to get more detail for dataset preparation.
 ```
 sh tool/evaluate_kitti_val.sh
 ```
 
-### Set Up Runtime Environments
+### Setup Runtime Environment
 
 - Nvidia Jetson Orin + CUDA 11.4 + cuDNN 8.9.0 + TensorRT 8.6.11
 
