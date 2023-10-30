@@ -53,12 +53,6 @@ file(GLOB_RECURSE CORE_FILES
     src/common/tensorrt.cpp
 )
 
-file(GLOB_RECURSE VISUALIZE_FILES 
-  ../libraries/cuOSD/src/*.cpp
-  ../libraries/cuOSD/src/*.cu
-  src/common/visualize.cu
-)
-
 ####################### libpointpillar_core.so ##########################
 cuda_add_library(pointpillar_core SHARED 
   	${CORE_FILES}
@@ -73,11 +67,9 @@ target_link_libraries(pointpillar_core
 ####################### pointpillar program #############################
 cuda_add_executable(pointpillar 
 	src/main.cpp
-	${VISUALIZE_FILES}
 )
 
 target_link_libraries(pointpillar
 	pointpillar_core
-	libnvinfer.so
 )
 #######################################################################
