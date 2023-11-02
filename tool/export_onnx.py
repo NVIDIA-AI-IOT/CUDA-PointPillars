@@ -27,7 +27,7 @@ from pcdet.models import build_network
 from pcdet.datasets import DatasetTemplate
 from pcdet.config import cfg, cfg_from_yaml_file
 
-from simplifier_onnx import divide_onnx, simplify_preprocess, simplify_postprocess
+from simplifier_onnx import divide_onnx, simplify_preprocess, simplify_postprocess, add_ln
 
 class DemoDataset(DatasetTemplate):
     def __init__(self, dataset_cfg, class_names, training=True, root_path=None, logger=None, ext='.bin'):

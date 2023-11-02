@@ -13,6 +13,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import onnx
 import numpy as np
 import onnx_graphsurgeon as gs
@@ -103,7 +104,7 @@ def simplify_preprocess(onnx_model):
   for i in range(6):
     next_node = [node for node in graph.nodes if node.inputs[0] == current_node.outputs[0]][0]
     if i == 5:              # ReduceMax
-      current_node.attrs['keepdims'] = [1]
+      current_node.attrs['keepdims'] = [0]
       break
     current_node = next_node
 
@@ -153,6 +154,35 @@ def divide_onnx(onnx_model):
 
     return pfe_graph, backbone_graph
 
+def add_ln():
+    pfe_graph = gs.import_onnx(onnx.load("model/pfe.onnx"))
+    ln_graph = gs.import_onnx(onnx.load("model/NoOP.onnx"))
+    backbone_graph = gs.import_onnx(onnx.load("model/backbone.onnx"))
+
+    interm_var = gs.Variable(name="ln_in", shape=ln_graph.inputs[0].shape, dtype=np.float32)
+    rm_node = [node for node in pfe_graph.nodes if node.op == "ReduceMax"][-1]
+    rm_node.outputs[0] = interm_var
+    ln_first_node = [node for node in ln_graph.nodes if node.op == "Reshape"][0]
+    ln_first_node.inputs[0] = interm_var
+
+    interm_var2 = gs.Variable(name="feat", shape=ln_graph.outputs[0].shape, dtype=np.float32)
+    ln_last_node = [node for node in ln_graph.nodes if node.op == "Reshape"][-1]
+    ln_last_node.outputs[0] = interm_var2
+    plugin_node = [node for node in backbone_graph.nodes if node.op == "PPScatterPlugin"][0]
+    plugin_node.inputs[0] = interm_var2
+
+    pfe_graph.nodes.extend(ln_graph.nodes)
+    pfe_graph.nodes.extend(backbone_graph.nodes)
+    pfe_graph.outputs = backbone_graph.outputs
+    pfe_graph.inputs.append(backbone_graph.inputs[1])
+    pfe_graph.inputs.append(backbone_graph.inputs[2])
+
+    pfe_graph.cleanup().toposort()
+
+    onnx.save(gs.export_onnx(pfe_graph), os.path.join("model/pp_ln.onnx"))
+
+
 if __name__ == '__main__':
-    mode_file = "pointpillar-native-sim.onnx"
-    simplify_preprocess(onnx.load(mode_file))
+    # mode_file = "pointpillar-native-sim.onnx"
+    # simplify_preprocess(onnx.load(mode_file))
+    add_ln()

@@ -46,12 +46,6 @@ public:
             return false;
         }
 
-        lidar_pfe_ = create_pfe(param.pfe_model);
-            if (lidar_pfe_ == nullptr) {
-            printf("Failed to create lidar pfe.\n");
-            return false;
-        }
-
         lidar_backbone_ = create_backbone(param.lidar_model);
             if (lidar_backbone_ == nullptr) {
             printf("Failed to create lidar backbone & head.\n");
@@ -88,8 +82,7 @@ public:
         checkRuntime(cudaMemcpyAsync(lidar_points_device_, lidar_points_host_, bytes_points, cudaMemcpyHostToDevice, _stream));
 
         this->lidar_voxelization_->forward(lidar_points_device_, num_points, _stream);
-        this->lidar_pfe_->forward(this->lidar_voxelization_->features(), _stream);
-        this->lidar_backbone_->forward(this->lidar_pfe_->feature(), this->lidar_voxelization_->coords(), this->lidar_voxelization_->params(), _stream);
+        this->lidar_backbone_->forward(this->lidar_voxelization_->features(), this->lidar_voxelization_->coords(), this->lidar_voxelization_->params(), _stream);
         this->lidar_postprocess_->forward(this->lidar_backbone_->cls(), this->lidar_backbone_->box(), this->lidar_backbone_->dir(), _stream);
 
         return this->lidar_postprocess_->bndBoxVec();
@@ -118,8 +111,7 @@ public:
         times.emplace_back(timer_.stop("Lidar Voxelization"));
 
         timer_.start(_stream);
-        this->lidar_pfe_->forward(this->lidar_voxelization_->features(), _stream);
-        this->lidar_backbone_->forward(this->lidar_pfe_->feature(), this->lidar_voxelization_->coords(), this->lidar_voxelization_->params(), _stream);
+        this->lidar_backbone_->forward(this->lidar_voxelization_->features(), this->lidar_voxelization_->coords(), this->lidar_voxelization_->params(), _stream);
         times.emplace_back(timer_.stop("Lidar Backbone & Head"));
 
         timer_.start(_stream);
@@ -143,7 +135,6 @@ public:
     virtual void set_timer(bool enable) override { enable_timer_ = enable; }
 
     virtual void print() override {
-        lidar_pfe_->print();
         lidar_backbone_->print();
     }
 
@@ -156,7 +147,6 @@ private:
     size_t bytes_capacity_points_ = 0;
 
     std::shared_ptr<Voxelization> lidar_voxelization_;
-    std::shared_ptr<PFE> lidar_pfe_;
     std::shared_ptr<Backbone> lidar_backbone_;
     std::shared_ptr<PostProcess> lidar_postprocess_;
 
