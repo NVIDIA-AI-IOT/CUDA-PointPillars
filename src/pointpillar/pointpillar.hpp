@@ -25,7 +25,6 @@
 #define __POINTPILLAR_HPP__
 
 #include "lidar-voxelization.hpp"
-#include "lidar-pfe.hpp"
 #include "lidar-backbone.hpp"
 #include "lidar-postprocess.hpp"
 // #include "nms.hpp"
@@ -35,7 +34,6 @@ namespace lidar {
 
 struct CoreParameter {
     VoxelizationParameter voxelization;
-    std::string pfe_model;
     std::string lidar_model;
     PostProcessParameter lidar_post;
 };

@@ -83,7 +83,7 @@ nvinfer1::DimsExprs PPScatterPlugin::getOutputDimensions(
     nvinfer1::DimsExprs output;
     output.nbDims = 4;
     output.d[0] = exprBuilder.constant(1);
-    output.d[1] = inputs[0].d[2];
+    output.d[1] = inputs[0].d[1];
     output.d[2] = exprBuilder.constant(feature_y_size_);
     output.d[3] = exprBuilder.constant(feature_x_size_);
     return output;
@@ -133,7 +133,7 @@ int PPScatterPlugin::enqueue(const nvinfer1::PluginTensorDesc* inputDesc,
 {
     try
     {
-        int numFeatures = inputDesc[0].dims.d[2];
+        int numFeatures = inputDesc[0].dims.d[1];
         
         nvinfer1::DataType inputType = inputDesc[0].type;
 
