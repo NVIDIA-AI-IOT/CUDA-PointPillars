@@ -134,55 +134,45 @@ def simplify_preprocess(onnx_model):
 
   return gs.export_onnx(graph)
 
-def divide_onnx(onnx_model):
+def add_gather_to_onnx(onnx_model):
 
     graph = gs.import_onnx(onnx_model)
     rm_node = [node for node in graph.nodes if node.op == "ReduceMax"][-1]
-    graph.inputs = [graph.inputs[0]]
-    graph.outputs = [rm_node.outputs[0]]
-    graph.outputs[0].name = "feature"
-    graph.cleanup().toposort()
-    pfe_graph = gs.export_onnx(graph)
-
-    graph = gs.import_onnx(onnx_model)
     plugin_node = [node for node in graph.nodes if node.op == "PPScatterPlugin"][0]
-    plugin_node.inputs[0] = rm_node.outputs[0]
-    graph.inputs[0] = rm_node.outputs[0]
-    graph.inputs[0].name = "feature"
-    graph.cleanup().toposort()
-    backbone_graph = gs.export_onnx(graph)
 
-    return pfe_graph, backbone_graph
-
-def add_ln():
-    pfe_graph = gs.import_onnx(onnx.load("model/pfe.onnx"))
-    ln_graph = gs.import_onnx(onnx.load("model/NoOP.onnx"))
-    backbone_graph = gs.import_onnx(onnx.load("model/backbone.onnx"))
-
-    interm_var = gs.Variable(name="ln_in", shape=ln_graph.inputs[0].shape, dtype=np.float32)
-    rm_node = [node for node in pfe_graph.nodes if node.op == "ReduceMax"][-1]
+    interm_var = gs.Variable(name="gather_in", shape=[10000, 64], dtype=np.float32)
     rm_node.outputs[0] = interm_var
-    ln_first_node = [node for node in ln_graph.nodes if node.op == "Reshape"][0]
-    ln_first_node.inputs[0] = interm_var
 
-    interm_var2 = gs.Variable(name="feat", shape=ln_graph.outputs[0].shape, dtype=np.float32)
-    ln_last_node = [node for node in ln_graph.nodes if node.op == "Reshape"][-1]
-    ln_last_node.outputs[0] = interm_var2
-    plugin_node = [node for node in backbone_graph.nodes if node.op == "PPScatterPlugin"][0]
-    plugin_node.inputs[0] = interm_var2
+    reshape_in = gs.Node(name="reshape_in_", op = "Reshape")
+    reshape_in.inputs.append(interm_var)
+    reshape_in_shape = gs.Constant(name="reshape_in_shape_", values = np.array([10000, 64, 1], dtype=np.int64))
+    reshape_in.inputs.append(reshape_in_shape)
+    reshape_in_out = gs.Variable(name="reshape_in_out_", shape = [10000, 64, 1], dtype=np.float32)
+    reshape_in.outputs.append(reshape_in_out)
+    graph.nodes.append(reshape_in)
 
-    pfe_graph.nodes.extend(ln_graph.nodes)
-    pfe_graph.nodes.extend(backbone_graph.nodes)
-    pfe_graph.outputs = backbone_graph.outputs
-    pfe_graph.inputs.append(backbone_graph.inputs[1])
-    pfe_graph.inputs.append(backbone_graph.inputs[2])
+    dummy_gather = gs.Node(name="dummy_gather_", op = "Gather")
+    dummy_gather.inputs.append(reshape_in_out)
+    dummy_gather.attrs['axis'] = 2
+    dummy_gather_indices = gs.Constant(name="dummy_gather_indices_", values = np.array(0, dtype=np.int64))
+    dummy_gather.inputs.append(dummy_gather_indices)
+    dummy_gather_out = gs.Variable(name="dummy_gather_out_", shape = [10000, 64, 1], dtype=np.float32)
+    dummy_gather.outputs.append(dummy_gather_out)
+    graph.nodes.append(dummy_gather)
 
-    pfe_graph.cleanup().toposort()
+    reshape_out = gs.Node(name="reshape_out_", op = "Reshape")
+    reshape_out.inputs.append(dummy_gather_out)
+    reshape_out_shape = gs.Constant(name="reshape_out_shape_", values = np.array([10000, 64], dtype=np.int64))
+    reshape_out.inputs.append(reshape_out_shape)
+    reshape_out_out = gs.Variable(name="reshape_out_out_", shape = [10000, 64], dtype=np.float32)
+    reshape_out.outputs.append(reshape_out_out)
+    graph.nodes.append(reshape_out)
 
-    onnx.save(gs.export_onnx(pfe_graph), os.path.join("model/pp_ln.onnx"))
+    plugin_node.inputs[0] = reshape_out_out
+
+    return gs.export_onnx(graph)
 
 
 if __name__ == '__main__':
-    # mode_file = "pointpillar-native-sim.onnx"
-    # simplify_preprocess(onnx.load(mode_file))
-    add_ln()
+    mode_file = "pointpillar-native-sim.onnx"
+    simplify_preprocess(onnx.load(mode_file))
