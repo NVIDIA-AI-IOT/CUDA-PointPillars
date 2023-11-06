@@ -68,7 +68,7 @@ Average perf in FP16 on the training set(7481 instances) of KITTI dataset.
 ```
 |                   | Car@R11 | Pedestrian@R11 | Cyclist@R11  | 
 | ----------------- | --------| -------------- | ------------ |
-| CUDA-PointPillars | 76.98   | 52.18          | 62.54        |
+| CUDA-PointPillars | 77.01   | 51.31          | 62.55        |
 | OpenPCDet         | 77.28   | 52.29          | 62.68        |
 ```
 
