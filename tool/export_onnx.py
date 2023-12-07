@@ -27,7 +27,7 @@ from pcdet.models import build_network
 from pcdet.datasets import DatasetTemplate
 from pcdet.config import cfg, cfg_from_yaml_file
 
-from simplifier_onnx import simplify_preprocess, simplify_postprocess, add_gather_to_onnx
+from modify_onnx import simplify_preprocess, simplify_postprocess
 
 class DemoDataset(DatasetTemplate):
     def __init__(self, dataset_cfg, class_names, training=True, root_path=None, logger=None, ext='.bin'):
@@ -144,10 +144,6 @@ def main():
 
     onnx_final = simplify_preprocess(onnx_simp)
     onnx.save(onnx_final, os.path.join(args.out_dir, "pointpillar.onnx"))
-
-    # Trigger myelin for pfe part with NoOP gather
-    backbone_onnx = add_gather_to_onnx(onnx_final)
-    onnx.save(backbone_onnx, os.path.join(args.out_dir, "backbone.onnx"))
 
     logger.info('[PASS] ONNX EXPORTED.')
 
