@@ -57,10 +57,10 @@ Average perf in FP16 on the training set(7481 instances) of KITTI dataset.
 ```
 | Function(unit:ms) | Orin   |
 | ----------------- | ------ |
-| Voxelization      | 0.12   |
-| Backbone & Head   | 6.09   |
-| Decoder & NMS     | 1.58   |
-| Overall           | 7.79   |
+| Voxelization      | 0.18   |
+| Backbone & Head   | 4.87   |
+| Decoder & NMS     | 1.79   |
+| Overall           | 6.84   |
 ```
 
 3D moderate metrics on the validation set(3769 instances) of KITTI dataset.
@@ -68,7 +68,7 @@ Average perf in FP16 on the training set(7481 instances) of KITTI dataset.
 ```
 |                   | Car@R11 | Pedestrian@R11 | Cyclist@R11  | 
 | ----------------- | --------| -------------- | ------------ |
-| CUDA-PointPillars | 77.01   | 51.31          | 62.55        |
+| CUDA-PointPillars | 77.00   | 52.50          | 62.26        |
 | OpenPCDet         | 77.28   | 52.29          | 62.68        |
 ```
 
