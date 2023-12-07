@@ -47,7 +47,7 @@ cd CUDA-PointPillars && . tool/environment.sh
 mkdir build && cd build
 cmake .. && make -j$(nproc)
 cd ../ && sh tool/build_trt_engine.sh
-cd build && ./pointpillar
+cd build && ./pointpillar ../data/ ../data/ --timer
 ```
 
 ## FP16 Performance && Metrics
