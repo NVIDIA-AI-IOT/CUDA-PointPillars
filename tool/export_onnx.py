@@ -102,43 +102,46 @@ def main():
 
     with torch.no_grad():
 
-      MAX_VOXELS = 10000
+        MAX_VOXELS = 10000
 
-      dummy_voxels = torch.zeros(
-          (MAX_VOXELS, 32, 4),
-          dtype=torch.float32,
-          device='cuda:0')
+        dummy_voxels = torch.zeros(
+            (MAX_VOXELS, 32, 4),
+            dtype=torch.float32,
+            device='cuda:0')
 
-      dummy_voxel_idxs = torch.zeros(
-          (MAX_VOXELS, 4),
-          dtype=torch.int32,
-          device='cuda:0')
+        dummy_voxel_idxs = torch.zeros(
+            (MAX_VOXELS, 4),
+            dtype=torch.int32,
+            device='cuda:0')
 
-      dummy_voxel_num = torch.zeros(
-          (1,),
-          dtype=torch.int32,
-          device='cuda:0')
+        dummy_voxel_num = torch.zeros(
+            (1,),
+            dtype=torch.int32,
+            device='cuda:0')
 
-      dummy_input = dict()
-      dummy_input['voxels'] = dummy_voxels
-      dummy_input['voxel_num_points'] = dummy_voxel_num
-      dummy_input['voxel_coords'] = dummy_voxel_idxs
-      dummy_input['batch_size'] = 1
+        dummy_input = dict()
+        dummy_input['voxels'] = dummy_voxels
+        dummy_input['voxel_num_points'] = dummy_voxel_num
+        dummy_input['voxel_coords'] = dummy_voxel_idxs
+        dummy_input['batch_size'] = 1
 
-      torch.onnx.export(model,       # model being run
-          dummy_input,               # model input (or a tuple for multiple inputs)
-          os.path.join(args.out_dir, "pointpillar_raw.onnx"),  # where to save the model (can be a file or file-like object)
-          export_params=True,        # store the trained parameter weights inside the model file
-          opset_version=11,          # the ONNX version to export the model to
-          do_constant_folding=True,  # whether to execute constant folding for optimization
-          keep_initializers_as_inputs=True,
-          input_names = ['voxels', 'voxel_num', 'voxel_idxs'],   # the model's input names
-          output_names = ['cls_preds', 'box_preds', 'dir_cls_preds'], # the model's output names
-          )
+        torch.onnx.export(
+            model=model,                                                # model being run
+            args=({"batch_dict": dummy_input}),                         # model input (or a tuple for multiple inputs)
+            f=os.path.join(args.out_dir, "pointpillar_raw.onnx"),       # where to save the model (can be a file or file-like object)
+            export_params=True,                                         # store the trained parameter weights inside the model file
+            opset_version=11,                                           # the ONNX version to export the model to
+            do_constant_folding=True,                                   # whether to execute constant folding for optimization
+            keep_initializers_as_inputs=True,                           # whether to keep initializers as inputs or not
+            input_names = ['voxels', 'voxel_num', 'voxel_idxs'],        # the model's input names
+            output_names = ['cls_preds', 'box_preds', 'dir_cls_preds'], # the model's output names
+            )
 
     onnx_raw = onnx.load(os.path.join(args.out_dir, "pointpillar_raw.onnx"))  # load onnx model
     onnx_trim_post = simplify_postprocess(onnx_raw)
-
+    
+    # recommend onnx==1.15.0, onnx version >= 1.16.0 will cause error like:
+    # name: /vfe/ScatterND OpType: ScatterND is not output of any previous nodes.
     onnx_simp, check = simplify(onnx_trim_post)
     assert check, "Simplified ONNX model could not be validated"
 

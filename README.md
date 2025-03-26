@@ -23,7 +23,7 @@ nvidia-docker run --rm -ti -v /home/$USER/:/home/$USER/ --net=host --rm pointpil
 For model exporting, please run the following command to clone pcdet repo and install custom CUDA extensions:
 ```
 git clone https://github.com/open-mmlab/OpenPCDet.git
-cd OpenPCDet && git checkout 846cf3e && python3 setup.py develop
+cd OpenPCDet && git checkout 8caccce && python3 setup.py develop
 ```
 Download [PTM](https://drive.google.com/file/d/1wMxWTpU1qUoY3DsCH31WJmvJxcjFXKlm/view) to ckpts/, then use below command to export ONNX model:
 ```
