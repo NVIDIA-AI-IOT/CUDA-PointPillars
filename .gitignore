@@ -1,8 +1,57 @@
+# IDE
 .vscode
-build
+.idea/
+*.swp
+*.swo
+*~
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Project specific
 ckpts
 data
 model/pointpillar_raw.onnx
 model/*.plan
 workspace
-**/__pycache__
+
+# Python
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+*.cover
+*.log
+.tox/
+.nox/
+
+# Virtual environments
+venv/
+.venv/
+env/
+.env/
+ENV/
+virtualenv/
+
+# Poetry
+# Note: poetry.lock should be committed
+dist/
+# poetry.lock is NOT ignored
+
+# Claude
+.claude/*
+
+# OS
+.DS_Store
+Thumbs.db
+*.bak
