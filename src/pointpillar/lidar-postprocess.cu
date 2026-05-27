@@ -89,7 +89,8 @@ __global__ void postprocess_kernal(const float *cls_input,
     }
   }
 
-  if (max_score >= score_thresh)
+  // Only output car class (id == 0) during inference
+  if (max_score >= score_thresh && cls_id == 0)
   {
     int box_offset = loc_index * num_anchors * num_box_values + ith_anchor * num_box_values;
     int dir_cls_offset = loc_index * num_anchors * 2 + ith_anchor * 2;
@@ -386,7 +387,15 @@ cudaError_t nms_launch(unsigned int boxes_num,
                uint64_t* mask,
                cudaStream_t stream)
 {
+    if (boxes_num == 0) {
+        return cudaSuccess;
+    }
+
     int col_blocks = DIVUP(boxes_num, NMS_THREADS_PER_BLOCK);
+
+    if (col_blocks == 0) {
+        return cudaSuccess;
+    }
 
     dim3 blocks(col_blocks, col_blocks);
     dim3 threads(NMS_THREADS_PER_BLOCK);

@@ -4,3 +4,11 @@
 [submodule "eval/kitti-object-eval-python"]
 	path = eval/kitti-object-eval-python
 	url = https://github.com/traveller59/kitti-object-eval-python.git
+[submodule "cumm"]
+	path = cumm-0.4.8
+	url = https://github.com/tsinghua-rllab/cumm.git
+	branch = v0.4.8
+[submodule "spconv"]
+	path = spconv-2.3.6
+	url = https://github.com/traveller59/spconv.git
+	branch = v2.3.6

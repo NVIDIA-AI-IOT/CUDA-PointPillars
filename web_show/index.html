@@ -1,0 +1,2899 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>点云可视化 - Point Cloud Viewer</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="./OrbitControls.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #0f0c29 0%, #302b63 50%, #24243e 100%);
+            background-attachment: fixed;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(135deg, rgba(102, 126, 234, 0.95) 0%, rgba(118, 75, 162, 0.95) 100%);
+            backdrop-filter: blur(20px);
+            padding: 24px 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.1);
+            z-index: 1000;
+            position: relative;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(255, 255, 255, 0.1) 0%, transparent 100%);
+            pointer-events: none;
+        }
+
+        h1 {
+            font-size: 28px;
+            margin-bottom: 6px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+            position: relative;
+            z-index: 1;
+        }
+
+        .subtitle {
+            font-size: 14px;
+            opacity: 0.95;
+            font-weight: 400;
+            letter-spacing: 0.3px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .toolbar {
+            background: rgba(26, 26, 38, 0.8);
+            backdrop-filter: blur(20px);
+            padding: 18px 30px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+
+        .upload-area {
+            position: relative;
+            display: inline-block;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.5s;
+        }
+
+        .btn:hover::before {
+            left: 100%;
+        }
+
+        .btn:hover {
+            transform: translateY(-3px) scale(1.02);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.5);
+        }
+
+        .btn:active {
+            transform: translateY(-1px) scale(0.98);
+            box-shadow: 0 2px 10px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, rgba(68, 68, 68, 0.9) 0%, rgba(85, 85, 85, 0.9) 100%);
+            backdrop-filter: blur(10px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-secondary:hover {
+            background: linear-gradient(135deg, rgba(85, 85, 85, 0.95) 0%, rgba(102, 102, 102, 0.95) 100%);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 12px;
+            min-width: 36px;
+            border-radius: 8px;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.2);
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .btn-sm:hover {
+            transform: translateY(-1px) scale(1.05);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-sm:active {
+            transform: translateY(0) scale(0.98);
+        }
+
+        input[type="file"] {
+            display: none;
+        }
+
+        .file-info {
+            padding: 10px 18px;
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 10px;
+            font-size: 13px;
+            color: #e0e0e0;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            font-weight: 500;
+        }
+
+        .viewer-container {
+            flex: 1;
+            position: relative;
+            background: linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 100%);
+            overflow: hidden;
+        }
+
+        .viewer-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle at 20% 50%, rgba(102, 126, 234, 0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 80%, rgba(118, 75, 162, 0.1) 0%, transparent 50%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        #viewer {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            z-index: 1;
+        }
+
+        .controls-panel {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            bottom: 20px;
+            background: rgba(20, 20, 30, 0.85);
+            padding: 20px;
+            border-radius: 20px;
+            min-width: 280px;
+            max-width: 320px;
+            backdrop-filter: blur(20px) saturate(180%);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 
+                        0 0 0 1px rgba(255, 255, 255, 0.1),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            overflow-y: auto;
+            overflow-x: hidden;
+            z-index: 100;
+            pointer-events: auto;
+        }
+
+        .controls-panel::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        .controls-panel::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+
+        .controls-panel::-webkit-scrollbar-thumb {
+            background: rgba(102, 126, 234, 0.5);
+            border-radius: 4px;
+        }
+
+        .controls-panel::-webkit-scrollbar-thumb:hover {
+            background: rgba(102, 126, 234, 0.7);
+        }
+
+        .control-group {
+            margin-bottom: 20px;
+            padding: 16px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            transition: all 0.3s ease;
+        }
+
+        .control-group:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(102, 126, 234, 0.3);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        }
+
+        .control-group:last-child {
+            margin-bottom: 0;
+        }
+
+        .control-label {
+            font-size: 13px;
+            color: #e0e0e0;
+            margin-bottom: 8px;
+            display: block;
+            font-weight: 500;
+            letter-spacing: 0.3px;
+        }
+
+        .slider {
+            width: 100%;
+            height: 8px;
+            border-radius: 4px;
+            background: linear-gradient(90deg, rgba(68, 68, 68, 0.6) 0%, rgba(102, 102, 102, 0.6) 100%);
+            outline: none;
+            -webkit-appearance: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .slider:hover {
+            background: linear-gradient(90deg, rgba(102, 126, 234, 0.3) 0%, rgba(118, 75, 162, 0.3) 100%);
+        }
+
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            cursor: pointer;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.5), 0 0 0 3px rgba(102, 126, 234, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .slider::-webkit-slider-thumb:hover {
+            transform: scale(1.2);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.7), 0 0 0 4px rgba(102, 126, 234, 0.3);
+        }
+
+        .slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            cursor: pointer;
+            border: none;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.5), 0 0 0 3px rgba(102, 126, 234, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .slider::-moz-range-thumb:hover {
+            transform: scale(1.2);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.7), 0 0 0 4px rgba(102, 126, 234, 0.3);
+        }
+
+        .value-display {
+            font-size: 12px;
+            color: #667eea;
+            margin-top: 6px;
+            text-align: right;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .status {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(20, 20, 30, 0.9);
+            backdrop-filter: blur(20px);
+            padding: 12px 20px;
+            border-radius: 12px;
+            font-size: 13px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.1);
+            font-weight: 500;
+        }
+
+        .status.success {
+            color: #4caf50;
+        }
+
+        .status.error {
+            color: #f44336;
+        }
+
+        .status.info {
+            color: #2196f3;
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            display: none;
+        }
+
+        .loading.show {
+            display: block;
+        }
+
+        .spinner {
+            border: 4px solid rgba(102, 126, 234, 0.3);
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 10px;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(5px);
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .modal.show {
+            display: block;
+        }
+
+        .modal-content {
+            background: rgba(20, 20, 30, 0.95);
+            backdrop-filter: blur(30px);
+            margin: 5% auto;
+            padding: 30px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 24px;
+            width: 80%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5),
+                        0 0 0 1px rgba(255, 255, 255, 0.1),
+                        inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(30px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #667eea;
+        }
+
+        .close {
+            color: #aaa;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            line-height: 1;
+        }
+
+        .close:hover {
+            color: #fff;
+        }
+
+        .import-textarea {
+            width: 100%;
+            min-height: 200px;
+            background: rgba(26, 26, 38, 0.8);
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            color: #e0e0e0;
+            padding: 15px;
+            border-radius: 12px;
+            font-family: 'Courier New', 'Monaco', monospace;
+            font-size: 13px;
+            resize: vertical;
+            transition: all 0.3s ease;
+            line-height: 1.6;
+        }
+
+        .import-textarea:focus {
+            outline: none;
+            border-color: #667eea;
+            background: rgba(26, 26, 38, 0.95);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+        }
+
+        .import-textarea:hover {
+            border-color: rgba(102, 126, 234, 0.5);
+        }
+
+        .box-item, .line-item {
+            background: rgba(255, 255, 255, 0.04);
+            padding: 14px;
+            margin-bottom: 10px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 12px;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .box-item:hover, .line-item:hover {
+            background: rgba(255, 255, 255, 0.06);
+            border-color: rgba(102, 126, 234, 0.4);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .box-header, .line-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+
+        .box-title, .line-title {
+            font-weight: 600;
+            color: #667eea;
+            font-size: 13px;
+            letter-spacing: 0.3px;
+        }
+
+        .box-params, .line-params {
+            margin-top: 5px;
+            font-size: 11px;
+        }
+
+        .param-group {
+            display: grid;
+            grid-template-columns: auto 1fr auto auto auto;
+            gap: 5px;
+            margin-bottom: 8px;
+            align-items: center;
+        }
+
+        .param-label {
+            font-size: 13px;
+            color: #d0d0d0;
+            font-weight: 500;
+        }
+
+        .param-input {
+            background: rgba(26, 26, 46, 0.8);
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 13px;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .param-input:focus {
+            outline: none;
+            border-color: #667eea;
+            background: rgba(26, 26, 46, 0.95);
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.2);
+        }
+
+        .param-input:hover {
+            border-color: rgba(102, 126, 234, 0.5);
+        }
+
+        .param-label-small {
+            color: #aaa;
+            font-size: 11px;
+        }
+
+        .param-input-small {
+            background: rgba(26, 26, 38, 0.8);
+            border: 1px solid rgba(102, 126, 234, 0.3);
+            color: white;
+            padding: 5px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            width: 100%;
+            transition: all 0.3s ease;
+        }
+
+        .param-input-small:focus {
+            outline: none;
+            border-color: #667eea;
+            background: rgba(26, 26, 38, 0.95);
+            box-shadow: 0 0 0 2px rgba(102, 126, 234, 0.2);
+        }
+
+        .param-input-small:hover {
+            border-color: rgba(102, 126, 234, 0.5);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(231, 76, 60, 0.3);
+        }
+
+        .btn-danger:hover {
+            background: linear-gradient(135deg, #ec7063 0%, #e74c3c 100%);
+            box-shadow: 0 6px 20px rgba(231, 76, 60, 0.5);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
+            color: white;
+            box-shadow: 0 4px 15px rgba(39, 174, 96, 0.3);
+        }
+
+        .btn-success:hover {
+            background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+            box-shadow: 0 6px 20px rgba(39, 174, 96, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>点云可视化 - Point Cloud Viewer</h1>
+            <div class="subtitle">上传并可视化 .pcd 或 .bin 点云文件</div>
+        </div>
+
+        <div class="toolbar">
+            <div class="upload-area">
+                <input type="file" id="fileInput" accept=".pcd,.bin">
+                <button class="btn" onclick="document.getElementById('fileInput').click()">选择文件</button>
+            </div>
+            <div class="file-info" id="fileInfo" style="display: none;">
+                <span id="fileName"></span> (<span id="fileSize"></span>)
+            </div>
+            <button class="btn btn-secondary" onclick="resetView()">重置视角</button>
+            <button class="btn btn-secondary" onclick="toggleGrid()">切换网格</button>
+        </div>
+
+        <div class="viewer-container">
+            <div id="viewer"></div>
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <div>加载中...</div>
+            </div>
+            <div class="status info" id="status">准备就绪</div>
+        </div>
+
+        <div class="controls-panel">
+            <div class="control-group">
+                <label class="control-label">点大小</label>
+                <input type="range" class="slider" id="pointSize" min="0.05" max="3" value="0.5" step="0.05" oninput="updatePointSize(this.value)">
+                <div class="value-display" id="pointSizeValue">0.5</div>
+            </div>
+            <div class="control-group">
+                <label class="control-label">点云不透明度</label>
+                <input type="range" class="slider" id="opacity" min="0.1" max="1" value="1" step="0.1" oninput="updateOpacity(this.value)">
+                <div class="value-display" id="opacityValue">100%</div>
+            </div>
+            <div class="control-group">
+                <label class="control-label">背景颜色</label>
+                <input type="color" id="bgColor" value="#000000" onchange="updateBackground(this.value)" style="width: 100%; height: 30px; border: none; border-radius: 5px; cursor: pointer;">
+            </div>
+            <div class="control-group" style="border-top: 1px solid #444; padding-top: 15px; margin-top: 15px;">
+                <label class="control-label" style="font-weight: bold; color: #667eea; margin-bottom: 10px;">点云变换</label>
+                <div style="display: grid; grid-template-columns: 1fr; gap: 8px; margin-bottom: 10px;">
+                    <div style="position: relative; z-index: 1;">
+                        <label style="font-size: 11px; color: #aaa; display: block; margin-bottom: 3px;">X 平移</label>
+                        <div style="display: flex; gap: 5px; align-items: center;">
+                            <button class="btn btn-sm" onclick="adjustTransform('transformX', -0.1, false)" style="min-width: 35px; padding: 5px; position: relative; z-index: 2;">-</button>
+                            <input type="number" id="transformX" value="0" step="0.1" class="param-input" style="flex: 1; position: relative; z-index: 2;">
+                            <button class="btn btn-sm" onclick="adjustTransform('transformX', 0.1, false)" style="min-width: 35px; padding: 5px; position: relative; z-index: 2;">+</button>
+                        </div>
+                    </div>
+                    <div style="position: relative; z-index: 1;">
+                        <label style="font-size: 11px; color: #aaa; display: block; margin-bottom: 3px;">Y 平移</label>
+                        <div style="display: flex; gap: 5px; align-items: center;">
+                            <button class="btn btn-sm" onclick="adjustTransform('transformY', -0.1, false)" style="min-width: 35px; padding: 5px; position: relative; z-index: 2;">-</button>
+                            <input type="number" id="transformY" value="0" step="0.1" class="param-input" style="flex: 1; position: relative; z-index: 2;">
+                            <button class="btn btn-sm" onclick="adjustTransform('transformY', 0.1, false)" style="min-width: 35px; padding: 5px; position: relative; z-index: 2;">+</button>
+                        </div>
+                    </div>
+                    <div style="position: relative; z-index: 1;">
+                        <label style="font-size: 11px; color: #aaa; display: block; margin-bottom: 3px;">Z 平移</label>
+                        <div style="display: flex; gap: 5px; align-items: center;">
+                            <button class="btn btn-sm" onclick="adjustTransform('transformZ', -0.1, false)" style="min-width: 35px; padding: 5px; position: relative; z-index: 2;">-</button>
+                            <input type="number" id="transformZ" value="0" step="0.1" class="param-input" style="flex: 1; position: relative; z-index: 2;">
+                            <button class="btn btn-sm" onclick="adjustTransform('transformZ', 0.1, false)" style="min-width: 35px; padding: 5px; position: relative; z-index: 2;">+</button>
+                        </div>
+                    </div>
+                    <div style="position: relative; z-index: 1;">
+                        <label style="font-size: 11px; color: #aaa; display: block; margin-bottom: 3px;">Roll (度)</label>
+                        <div style="display: flex; gap: 5px; align-items: center;">
+                            <button class="btn btn-sm" onclick="adjustTransform('transformRoll', -0.1, true)" style="min-width: 35px; padding: 5px; position: relative; z-index: 2;">-</button>
+                            <input type="number" id="transformRoll" value="0" step="0.1" class="param-input" style="flex: 1; position: relative; z-index: 2;">
+                            <button class="btn btn-sm" onclick="adjustTransform('transformRoll', 0.1, true)" style="min-width: 35px; padding: 5px; position: relative; z-index: 2;">+</button>
+                        </div>
+                    </div>
+                    <div style="position: relative; z-index: 1;">
+                        <label style="font-size: 11px; color: #aaa; display: block; margin-bottom: 3px;">Pitch (度)</label>
+                        <div style="display: flex; gap: 5px; align-items: center;">
+                            <button class="btn btn-sm" onclick="adjustTransform('transformPitch', -0.1, true)" style="min-width: 35px; padding: 5px; position: relative; z-index: 2;">-</button>
+                            <input type="number" id="transformPitch" value="0" step="0.1" class="param-input" style="flex: 1; position: relative; z-index: 2;">
+                            <button class="btn btn-sm" onclick="adjustTransform('transformPitch', 0.1, true)" style="min-width: 35px; padding: 5px; position: relative; z-index: 2;">+</button>
+                        </div>
+                    </div>
+                    <div style="position: relative; z-index: 1;">
+                        <label style="font-size: 11px; color: #aaa; display: block; margin-bottom: 3px;">Yaw (度)</label>
+                        <div style="display: flex; gap: 5px; align-items: center;">
+                            <button class="btn btn-sm" onclick="adjustTransform('transformYaw', -0.1, true)" style="min-width: 35px; padding: 5px; position: relative; z-index: 2;">-</button>
+                            <input type="number" id="transformYaw" value="0" step="0.1" class="param-input" style="flex: 1; position: relative; z-index: 2;">
+                            <button class="btn btn-sm" onclick="adjustTransform('transformYaw', 0.1, true)" style="min-width: 35px; padding: 5px; position: relative; z-index: 2;">+</button>
+                        </div>
+                    </div>
+                </div>
+                <button class="btn" onclick="applyTransform()" style="width: 100%; margin-top: 5px; padding: 8px; font-size: 13px;">应用变换</button>
+                <button class="btn btn-secondary" onclick="resetTransform()" style="width: 100%; margin-top: 5px; padding: 8px; font-size: 13px;">重置变换</button>
+                <button class="btn btn-success" onclick="calculateGroundPlane()" style="width: 100%; margin-top: 5px; padding: 8px; font-size: 13px;">计算地平面</button>
+                <div id="groundPlaneResult" style="margin-top: 10px; padding: 8px; background: #1a1a1a; border-radius: 5px; font-size: 11px; color: #aaa; min-height: 20px;">尚未计算地平面</div>
+            </div>
+            <div class="control-group" style="border-top: 1px solid #444; padding-top: 15px; margin-top: 15px;">
+                <label class="control-label" style="font-weight: bold; color: #667eea; margin-bottom: 10px;">框体管理</label>
+                <button class="btn" onclick="addNewBox()" style="width: 100%; margin-bottom: 5px; padding: 8px; font-size: 13px;">添加框体</button>
+                <button class="btn btn-secondary" onclick="showImportBoxDialog()" style="width: 100%; margin-bottom: 5px; padding: 8px; font-size: 13px;">批量导入</button>
+                <div id="boxesList" style="max-height: 200px; overflow-y: auto; margin-top: 10px;"></div>
+            </div>
+            <div class="control-group" style="border-top: 1px solid #444; padding-top: 15px; margin-top: 15px;">
+                <label class="control-label" style="font-weight: bold; color: #667eea; margin-bottom: 10px;">线段管理</label>
+                <button class="btn" onclick="addNewLine()" style="width: 100%; margin-bottom: 5px; padding: 8px; font-size: 13px;">添加线段</button>
+                <div id="linesList" style="max-height: 200px; overflow-y: auto; margin-top: 10px;"></div>
+            </div>
+            <div class="control-group" style="border-top: 1px solid #444; padding-top: 15px; margin-top: 15px;">
+                <button class="btn btn-success" onclick="saveAsPCD()" style="width: 100%; padding: 8px; font-size: 13px;">保存PCD</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 批量导入框体对话框 -->
+    <div id="importBoxModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <span class="modal-title">批量导入框体数据</span>
+                <span class="close" onclick="closeImportBoxDialog()">&times;</span>
+            </div>
+            <div style="margin-bottom: 10px; font-size: 12px; color: #aaa;">
+                格式: 每行一个框体，参数用空格分隔<br>
+                参数顺序: x y z w l h rt<br>
+                示例: 34.56 0 -1 69.12 79.36 4 0
+            </div>
+            <textarea id="importBoxData" class="import-textarea" placeholder="粘贴框体数据，每行一个框体&#10;例如：&#10;34.56 0 -1 69.12 79.36 4 0&#10;8.69702 -1.82145 -0.671802 1.20388 0.627663 1.8344 4.79124"></textarea>
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 15px;">
+                <button class="btn btn-secondary" onclick="closeImportBoxDialog()">取消</button>
+                <button class="btn btn-success" onclick="importBoxes()">导入</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let scene, camera, renderer, controls;
+        let pointCloud = null;
+        let gridHelper = null;
+        let gridVisible = true;
+        let originalPositions = null; // 保存原始点云位置数据
+        let boxes = []; // 存储框体对象 {id, mesh, params: {x,y,z,w,l,h,rt}, isDefault: bool}
+        let lines = []; // 存储线段对象 {id, line, params: {x1,y1,z1,x2,y2,z2}}
+        let boxIdCounter = 0;
+        let lineIdCounter = 0;
+        let defaultBoxId = -1; // 默认框体的ID
+
+        // 初始化 Three.js 场景
+        function initViewer() {
+            const container = document.getElementById('viewer');
+            
+            if (!container) {
+                console.error('找不到 viewer 容器');
+                return;
+            }
+            
+            console.log('初始化 Three.js 场景...');
+            
+            // 创建场景
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x1a1a1a); // 使用深灰色背景，更容易看到内容
+
+            // 创建正交相机（取消近大远小效果）
+            const aspect = container.clientWidth / container.clientHeight || 1;
+            const viewSize = 100; // 视口大小，可以根据需要调整
+            const halfWidth = viewSize * aspect;
+            const halfHeight = viewSize;
+            camera = new THREE.OrthographicCamera(
+                -halfWidth,  // left
+                halfWidth,   // right
+                halfHeight,  // top
+                -halfHeight, // bottom
+                0.1,         // near
+                10000        // far
+            );
+            camera.position.set(50, 50, 50);
+            camera.lookAt(0, 0, 0);
+
+            // 创建渲染器
+            renderer = new THREE.WebGLRenderer({ 
+                antialias: true,
+                alpha: false,
+                powerPreference: "high-performance"
+            });
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // 限制像素比以提高性能
+            renderer.setClearColor(0x1a1a1a, 1);
+            
+            // 确保canvas可以接收鼠标事件
+            renderer.domElement.style.touchAction = 'none';
+            renderer.domElement.style.userSelect = 'none';
+            renderer.domElement.style.cursor = 'grab';
+            
+            container.appendChild(renderer.domElement);
+            
+            console.log('渲染器已创建，尺寸:', container.clientWidth, container.clientHeight);
+
+            // 添加轨道控制器
+            function initOrbitControls() {
+                try {
+                    if (typeof THREE.OrbitControls === 'undefined') {
+                        console.error('OrbitControls未加载，请检查CDN链接');
+                        updateStatus('警告: OrbitControls未正确加载，鼠标旋转可能不可用', 'error');
+                        // 重试
+                        setTimeout(initOrbitControls, 500);
+                        return;
+                    }
+                    
+                controls = new THREE.OrbitControls(camera, renderer.domElement);
+                controls.enableDamping = true;
+                controls.dampingFactor = 0.05;
+                controls.minDistance = 1;
+                controls.maxDistance = 10000;
+                controls.enablePan = true;
+                controls.enableZoom = true;
+                controls.enableRotate = true;
+                
+                // 移除旋转角度限制，允许360度自由旋转
+                controls.minPolarAngle = 0; // 允许从上往下看
+                controls.maxPolarAngle = Math.PI; // 允许从下往上看
+                controls.minAzimuthAngle = -Infinity; // 移除水平旋转限制
+                controls.maxAzimuthAngle = Infinity; // 移除水平旋转限制
+                
+                // 允许无限旋转
+                controls.autoRotate = false;
+                
+                    // 确保鼠标事件正确绑定（Three.js r128）
+                    if (controls.mouseButtons) {
+                        controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE;
+                        controls.mouseButtons.MIDDLE = THREE.MOUSE.DOLLY;
+                        controls.mouseButtons.RIGHT = THREE.MOUSE.PAN;
+                    }
+                    
+                    // 添加鼠标事件监听器用于调试
+                    renderer.domElement.addEventListener('mousedown', function(e) {
+                        console.log('鼠标按下事件:', e.button, e.clientX, e.clientY);
+                    });
+                    
+                    renderer.domElement.addEventListener('mousemove', function(e) {
+                        if (e.buttons === 1) {
+                            renderer.domElement.style.cursor = 'grabbing';
+                        }
+                    });
+                    
+                    renderer.domElement.addEventListener('mouseup', function() {
+                        renderer.domElement.style.cursor = 'grab';
+                    });
+                    
+                    console.log('OrbitControls 已创建并初始化');
+            } catch (error) {
+                console.error('创建 OrbitControls 失败:', error);
+                    updateStatus('错误: 无法初始化鼠标控制', 'error');
+                }
+            }
+            
+            // 延迟初始化，确保OrbitControls已加载
+            setTimeout(initOrbitControls, 200);
+
+            // 添加坐标轴（更大更明显）
+            const axesHelper = new THREE.AxesHelper(50);
+            scene.add(axesHelper);
+
+            // 添加网格（垂直于Z轴，在XY平面）
+            // 创建自定义网格组，在XY平面
+            const gridGroup = new THREE.Group();
+            const gridSize = 200;
+            const divisions = 20;
+            const step = gridSize / divisions;
+            const halfSize = gridSize / 2;
+            
+            // 创建网格材质
+            const gridMaterial = new THREE.LineBasicMaterial({ 
+                color: 0x666666,
+                opacity: 0.5,
+                transparent: true
+            });
+            const gridMaterialDark = new THREE.LineBasicMaterial({ 
+                color: 0x333333,
+                opacity: 0.3,
+                transparent: true
+            });
+            
+            // 创建X方向的线（平行于X轴，在XY平面）
+            for (let i = 0; i <= divisions; i++) {
+                const y = -halfSize + (i * step);
+                const geometry = new THREE.BufferGeometry().setFromPoints([
+                    new THREE.Vector3(-halfSize, y, 0),
+                    new THREE.Vector3(halfSize, y, 0)
+                ]);
+                const line = new THREE.Line(geometry, i % 5 === 0 ? gridMaterialDark : gridMaterial);
+                gridGroup.add(line);
+            }
+            
+            // 创建Y方向的线（平行于Y轴，在XY平面）
+            for (let i = 0; i <= divisions; i++) {
+                const x = -halfSize + (i * step);
+                const geometry = new THREE.BufferGeometry().setFromPoints([
+                    new THREE.Vector3(x, -halfSize, 0),
+                    new THREE.Vector3(x, halfSize, 0)
+                ]);
+                const line = new THREE.Line(geometry, i % 5 === 0 ? gridMaterialDark : gridMaterial);
+                gridGroup.add(line);
+            }
+            
+            gridHelper = gridGroup;
+            scene.add(gridHelper);
+
+            // 添加环境光（更亮）
+            const ambientLight = new THREE.AmbientLight(0xffffff, 1.0);
+            scene.add(ambientLight);
+
+            // 添加方向光（更亮）
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
+            directionalLight.position.set(50, 50, 50);
+            scene.add(directionalLight);
+            
+            // 添加另一个方向光从另一侧
+            const directionalLight2 = new THREE.DirectionalLight(0xffffff, 0.5);
+            directionalLight2.position.set(-50, 50, -50);
+            scene.add(directionalLight2);
+
+            // 窗口大小调整
+            window.addEventListener('resize', onWindowResize);
+
+            // 立即渲染一次，确保能看到坐标轴和网格
+            renderer.render(scene, camera);
+            console.log('初始渲染完成');
+
+            // 开始渲染循环
+            animate();
+        }
+
+        function onWindowResize() {
+            const container = document.getElementById('viewer');
+            if (camera instanceof THREE.OrthographicCamera) {
+                // 更新正交相机的参数
+                const aspect = container.clientWidth / container.clientHeight || 1;
+                // 根据点云大小动态调整视口，如果没有点云则使用默认值
+                let viewSize = 100;
+                if (pointCloud && pointCloud.geometry) {
+                    pointCloud.geometry.computeBoundingBox();
+                    const box = pointCloud.geometry.boundingBox;
+                    if (box) {
+                        const size = box.getSize(new THREE.Vector3());
+                        const maxDim = Math.max(size.x, size.y, size.z);
+                        viewSize = maxDim > 0 ? maxDim * 1.5 : 100;
+                    }
+                }
+                const halfWidth = viewSize * aspect;
+                const halfHeight = viewSize;
+                camera.left = -halfWidth;
+                camera.right = halfWidth;
+                camera.top = halfHeight;
+                camera.bottom = -halfHeight;
+                camera.updateProjectionMatrix();
+            } else {
+                // 如果是透视相机（向后兼容）
+                const aspect = container.clientWidth / container.clientHeight || 1;
+                camera.aspect = aspect;
+                camera.updateProjectionMatrix();
+            }
+            renderer.setSize(container.clientWidth, container.clientHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            if (controls) {
+                controls.update();
+            }
+            if (renderer && scene && camera) {
+                renderer.render(scene, camera);
+            }
+        }
+
+        // 解析 BIN 文件（二进制格式：每个点包含 x, y, z, intensity，每个值4字节float32）
+        function parseBinFile(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    try {
+                        const arrayBuffer = e.target.result;
+                        const dataView = new DataView(arrayBuffer);
+                        const fileSize = arrayBuffer.byteLength;
+                        
+                        // 每个点包含4个float32值（x, y, z, intensity），每个4字节
+                        const bytesPerPoint = 4 * 4; // 16字节
+                        const pointCount = Math.floor(fileSize / bytesPerPoint);
+                        
+                        if (pointCount === 0) {
+                            reject(new Error('BIN文件为空或格式不正确'));
+                            return;
+                        }
+                        
+                        // 检查文件大小是否匹配
+                        if (fileSize % bytesPerPoint !== 0) {
+                            console.warn(`文件大小不完全匹配：${fileSize} 字节，期望是 ${pointCount * bytesPerPoint} 字节的倍数`);
+                        }
+                        
+                        const positions = [];
+                        const colors = [];
+                        let minZ = Infinity, maxZ = -Infinity;
+                        let minIntensity = Infinity, maxIntensity = -Infinity;
+                        
+                        // 第一遍：读取所有数据并计算范围
+                        const tempData = [];
+                        for (let i = 0; i < pointCount; i++) {
+                            const offset = i * bytesPerPoint;
+                            
+                            // 读取float32值（小端序）
+                            const x = dataView.getFloat32(offset, true);
+                            const y = dataView.getFloat32(offset + 4, true);
+                            const z = dataView.getFloat32(offset + 8, true);
+                            const intensity = dataView.getFloat32(offset + 12, true);
+                            
+                            tempData.push({ x, y, z, intensity });
+                            
+                            // 更新范围
+                            if (z < minZ) minZ = z;
+                            if (z > maxZ) maxZ = z;
+                            if (intensity < minIntensity) minIntensity = intensity;
+                            if (intensity > maxIntensity) maxIntensity = intensity;
+                        }
+                        
+                        // 第二遍：生成位置和颜色数组
+                        const intensityRange = maxIntensity > minIntensity ? (maxIntensity - minIntensity) : 1;
+                        const zRange = maxZ > minZ ? (maxZ - minZ) : 1;
+                        
+                        for (const point of tempData) {
+                            positions.push(point.x, point.y, point.z);
+                            
+                            // 使用intensity字段进行颜色映射
+                            const normalizedIntensity = (point.intensity - minIntensity) / intensityRange;
+                            // 使用更亮的颜色映射
+                            const r = Math.min(1, normalizedIntensity * 1.2);
+                            const g = Math.min(1, normalizedIntensity * 1.0);
+                            const b = Math.min(1, normalizedIntensity * 0.8);
+                            colors.push(r, g, b);
+                        }
+                        
+                        if (positions.length === 0) {
+                            reject(new Error('未找到有效的点数据'));
+                            return;
+                        }
+                        
+                        // 计算位置范围（只检查前1000个点以提高性能）
+                        let minX = Infinity, maxX = -Infinity;
+                        let minY = Infinity, maxY = -Infinity;
+                        const checkCount = Math.min(1000, pointCount);
+                        for (let i = 0; i < checkCount * 3; i += 3) {
+                            if (positions[i] < minX) minX = positions[i];
+                            if (positions[i] > maxX) maxX = positions[i];
+                            if (positions[i+1] < minY) minY = positions[i+1];
+                            if (positions[i+1] > maxY) maxY = positions[i+1];
+                        }
+                        
+                        console.log(`成功解析 ${pointCount} 个点（BIN格式）`);
+                        console.log(`位置范围: X[${minX.toFixed(2)}, ${maxX.toFixed(2)}] Y[${minY.toFixed(2)}, ${maxY.toFixed(2)}] Z[${minZ.toFixed(2)}, ${maxZ.toFixed(2)}]`);
+                        console.log(`Intensity范围: [${minIntensity.toFixed(2)}, ${maxIntensity.toFixed(2)}]`);
+                        console.log(`颜色数组长度: ${colors.length}, 位置数组长度: ${positions.length}`);
+                        
+                        resolve({
+                            positions: new Float32Array(positions),
+                            colors: new Float32Array(colors),
+                            count: pointCount
+                        });
+                    } catch (error) {
+                        reject(error);
+                    }
+                };
+                
+                reader.onerror = function() {
+                    reject(new Error('读取BIN文件失败'));
+                };
+                
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        // 解析 PCD 文件
+        function parsePCDFile(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                
+                reader.onload = function(e) {
+                    try {
+                        const text = e.target.result;
+                        const lines = text.split('\n');
+                        
+                        // 解析 PCD 头部
+                        let width = 0, height = 0, points = 0;
+                        let fields = [];
+                        let size = [];
+                        let type = 'ASCII';
+                        let dataStart = 0;
+                        
+                        for (let i = 0; i < lines.length; i++) {
+                            const line = lines[i].trim();
+                            if (line.startsWith('VERSION')) continue;
+                            if (line.startsWith('FIELDS')) {
+                                fields = line.split(/\s+/).slice(1);
+                            } else if (line.startsWith('SIZE')) {
+                                size = line.split(/\s+/).slice(1).map(Number);
+                            } else if (line.startsWith('TYPE')) {
+                                // 跳过 TYPE 行
+                            } else if (line.startsWith('COUNT')) {
+                                // 跳过 COUNT 行
+                            } else if (line.startsWith('WIDTH')) {
+                                width = parseInt(line.split(/\s+/)[1]);
+                            } else if (line.startsWith('HEIGHT')) {
+                                height = parseInt(line.split(/\s+/)[1]);
+                            } else if (line.startsWith('VIEWPOINT')) {
+                                // 跳过 VIEWPOINT 行
+                            } else if (line.startsWith('POINTS')) {
+                                points = parseInt(line.split(/\s+/)[1]);
+                            } else if (line.startsWith('DATA')) {
+                                type = line.split(/\s+/)[1] || '';
+                                dataStart = i + 1;
+                                break;
+                            }
+                        }
+                        
+                        if (points === 0) {
+                            reject(new Error('无法解析 PCD 文件：未找到点数量'));
+                            return;
+                        }
+                        
+                        // 查找 intensity 或 reflectance 字段的位置（用于颜色映射）
+                        let intensityIndex = -1;
+                        if (fields.length > 0) {
+                            // 查找 intensity 或 reflectance 字段
+                            for (let i = 0; i < fields.length; i++) {
+                                const field = fields[i].toLowerCase();
+                                if (field === 'intensity' || field === 'reflectance' || field === 'i') {
+                                    intensityIndex = i;
+                                    break;
+                                }
+                            }
+                            // 如果没有找到，但字段数量 >= 4，假设第4个字段可能是 intensity
+                            if (intensityIndex === -1 && fields.length >= 4) {
+                                intensityIndex = 3;
+                            }
+                        }
+                        
+                        // 解析点数据
+                        const positions = [];
+                        const colors = [];
+                        let minZ = Infinity, maxZ = -Infinity;
+                        let minIntensity = Infinity, maxIntensity = -Infinity;
+                        
+                        // 检查是否为 ASCII 格式（不区分大小写）
+                        if (type.toUpperCase() === 'ASCII') {
+                            // 第一遍：收集所有数据并计算范围
+                            const tempData = [];
+                            for (let i = dataStart; i < lines.length && tempData.length < points; i++) {
+                                const line = lines[i].trim();
+                                if (!line) continue;
+                                
+                                // 支持逗号分隔和空格分隔两种格式
+                                let values;
+                                if (line.includes(',')) {
+                                    // 逗号分隔格式：22.693300, -12.148000, -2.878250, 0.198120
+                                    values = line.split(',').map(v => parseFloat(v.trim())).filter(v => !isNaN(v));
+                                } else {
+                                    // 空格分隔格式：-4.881 2.512 2.817 802 802 3 ...
+                                    values = line.split(/\s+/).map(v => parseFloat(v)).filter(v => !isNaN(v));
+                                }
+                                
+                                // 只取前三个字段 x, y, z
+                                if (values.length < 3) continue;
+                                
+                                const x = values[0];
+                                const y = values[1];
+                                const z = values[2];
+                                
+                                tempData.push({ x, y, z, intensity: intensityIndex >= 0 && values.length > intensityIndex ? values[intensityIndex] : null });
+                                
+                                // 更新 Z 范围
+                                if (z < minZ) minZ = z;
+                                if (z > maxZ) maxZ = z;
+                                
+                                // 更新 intensity 范围
+                                if (intensityIndex >= 0 && values.length > intensityIndex) {
+                                    const intensity = values[intensityIndex];
+                                    if (intensity < minIntensity) minIntensity = intensity;
+                                    if (intensity > maxIntensity) maxIntensity = intensity;
+                                }
+                            }
+                            
+                            // 第二遍：生成位置和颜色数组
+                            const intensityRange = maxIntensity > minIntensity ? (maxIntensity - minIntensity) : 1;
+                            const zRange = maxZ > minZ ? (maxZ - minZ) : 1;
+                            
+                            for (const point of tempData) {
+                                positions.push(point.x, point.y, point.z);
+                                
+                                // 颜色处理
+                                if (intensityIndex >= 0 && point.intensity !== null) {
+                                    // 使用 intensity 字段，归一化到 0-1
+                                    const normalizedIntensity = (point.intensity - minIntensity) / intensityRange;
+                                    // 使用更亮的颜色映射
+                                    const r = Math.min(1, normalizedIntensity * 1.2);
+                                    const g = Math.min(1, normalizedIntensity * 1.0);
+                                    const b = Math.min(1, normalizedIntensity * 0.8);
+                                    colors.push(r, g, b);
+                                } else {
+                                    // 使用高度映射颜色
+                                    const normalizedZ = (point.z - minZ) / zRange;
+                                    // 使用颜色映射：从蓝色（低）到红色（高）
+                                    const r = normalizedZ;
+                                    const g = normalizedZ * 0.5;
+                                    const b = 1 - normalizedZ;
+                                    colors.push(r, g, b);
+                                }
+                            }
+                        } else {
+                            // 二进制格式（简化处理）
+                            reject(new Error('暂不支持二进制 PCD 格式，请使用 ASCII 格式。当前检测到的格式: ' + type));
+                            return;
+                        }
+                        
+                        if (positions.length === 0) {
+                            reject(new Error('未找到有效的点数据'));
+                            return;
+                        }
+                        
+                        // 确保 colors 数组长度与 positions 匹配
+                        if (colors.length !== positions.length) {
+                            console.warn(`颜色数组长度不匹配: positions=${positions.length}, colors=${colors.length}`);
+                            // 填充默认颜色
+                            while (colors.length < positions.length) {
+                                colors.push(1, 1, 1);
+                            }
+                            colors = colors.slice(0, positions.length);
+                        }
+                        
+                        const pointCount = positions.length / 3;
+                        // 计算位置范围（只检查前1000个点以提高性能）
+                        let minX = Infinity, maxX = -Infinity;
+                        let minY = Infinity, maxY = -Infinity;
+                        const checkCount = Math.min(1000, pointCount);
+                        for (let i = 0; i < checkCount * 3; i += 3) {
+                            if (positions[i] < minX) minX = positions[i];
+                            if (positions[i] > maxX) maxX = positions[i];
+                            if (positions[i+1] < minY) minY = positions[i+1];
+                            if (positions[i+1] > maxY) maxY = positions[i+1];
+                        }
+                        
+                        console.log(`成功解析 ${pointCount} 个点`);
+                        console.log(`位置范围: X[${minX.toFixed(2)}, ${maxX.toFixed(2)}] Y[${minY.toFixed(2)}, ${maxY.toFixed(2)}] Z[${minZ.toFixed(2)}, ${maxZ.toFixed(2)}]`);
+                        if (intensityIndex >= 0 && maxIntensity > minIntensity) {
+                            console.log(`Intensity范围: [${minIntensity.toFixed(2)}, ${maxIntensity.toFixed(2)}]`);
+                        }
+                        console.log(`颜色数组长度: ${colors.length}, 位置数组长度: ${positions.length}`);
+                        
+                        resolve({
+                            positions: new Float32Array(positions),
+                            colors: new Float32Array(colors),
+                            count: pointCount
+                        });
+                    } catch (error) {
+                        reject(error);
+                    }
+                };
+                
+                reader.onerror = function() {
+                    reject(new Error('读取文件失败'));
+                };
+                
+                reader.readAsText(file);
+            });
+        }
+
+        // 加载点云
+        async function loadPointCloud(file) {
+            showLoading(true);
+            updateStatus('正在解析文件...', 'info');
+            
+            try {
+                // 根据文件扩展名选择解析函数
+                const fileName = file.name.toLowerCase();
+                let data;
+                
+                if (fileName.endsWith('.bin')) {
+                    data = await parseBinFile(file);
+                } else if (fileName.endsWith('.pcd')) {
+                    data = await parsePCDFile(file);
+                } else {
+                    throw new Error('不支持的文件格式，请使用 .pcd 或 .bin 文件');
+                }
+                
+                updateStatus(`找到 ${data.count} 个点`, 'info');
+                
+                // 移除旧的点云
+                if (pointCloud) {
+                    scene.remove(pointCloud);
+                    pointCloud.geometry.dispose();
+                    pointCloud.material.dispose();
+                }
+                
+                // 创建几何体
+                const geometry = new THREE.BufferGeometry();
+                
+                if (!data.positions || data.positions.length === 0) {
+                    throw new Error('点数据为空');
+                }
+                
+                if (!data.colors || data.colors.length === 0) {
+                    throw new Error('颜色数据为空');
+                }
+                
+                // 确保数据长度匹配
+                if (data.positions.length !== data.colors.length) {
+                    console.warn('位置和颜色数据长度不匹配，使用默认颜色');
+                    // 创建默认白色颜色数组
+                    const defaultColors = new Float32Array(data.positions.length);
+                    for (let i = 0; i < defaultColors.length; i += 3) {
+                        defaultColors[i] = 1;
+                        defaultColors[i + 1] = 1;
+                        defaultColors[i + 2] = 1;
+                    }
+                    geometry.setAttribute('color', new THREE.BufferAttribute(defaultColors, 3));
+                } else {
+                    geometry.setAttribute('color', new THREE.BufferAttribute(data.colors, 3));
+                }
+                
+                geometry.setAttribute('position', new THREE.BufferAttribute(data.positions, 3));
+                
+                // 先计算边界框，以便根据点云大小调整点的大小
+                geometry.computeBoundingBox();
+                const box = geometry.boundingBox;
+                
+                let adaptivePointSize = parseFloat(document.getElementById('pointSize').value);
+                
+                if (box) {
+                    const size = box.getSize(new THREE.Vector3());
+                    const maxDim = Math.max(size.x, size.y, size.z);
+                    
+                    // 根据点云大小动态调整点的大小
+                    // 如果点云很大（>100单位），大幅减小点的大小
+                    if (maxDim > 100) {
+                        adaptivePointSize = Math.max(0.05, adaptivePointSize * (50 / maxDim));
+                    } else if (maxDim > 50) {
+                        adaptivePointSize = Math.max(0.05, adaptivePointSize * (30 / maxDim));
+                    } else if (maxDim < 10) {
+                        // 如果点云很小，稍微增大点的大小
+                        adaptivePointSize = Math.min(3, adaptivePointSize * (10 / maxDim));
+                    }
+                    
+                    console.log('点云尺寸:', { size, maxDim, adaptivePointSize });
+                }
+                
+                // 保存原始位置数据用于变换
+                originalPositions = new Float32Array(data.positions);
+                
+                // 创建材质
+                const opacity = parseFloat(document.getElementById('opacity').value);
+                
+                console.log('点云材质设置:', { pointSize: adaptivePointSize, opacity, vertexColors: true });
+                
+                const material = new THREE.PointsMaterial({
+                    size: adaptivePointSize,
+                    vertexColors: true,
+                    transparent: opacity < 1.0,
+                    opacity: opacity,
+                    sizeAttenuation: true // 启用距离衰减，使远处的点看起来更小
+                });
+                
+                // 创建点云对象
+                pointCloud = new THREE.Points(geometry, material);
+                scene.add(pointCloud);
+                
+                // 调整相机
+                if (!box || !controls) {
+                    updateStatus('警告: 无法计算边界框，使用默认视角', 'info');
+                    // 使用默认视角
+                    camera.position.set(50, 50, 50);
+                    camera.lookAt(0, 0, 0);
+                    if (controls && controls.target) {
+                        controls.target.set(0, 0, 0);
+                        controls.update();
+                    }
+                } else {
+                    const center = box.getCenter(new THREE.Vector3());
+                    const size = box.getSize(new THREE.Vector3());
+                    const maxDim = Math.max(size.x, size.y, size.z);
+                    
+                    console.log('边界框信息:', {
+                        min: box.min,
+                        max: box.max,
+                        center: center,
+                        size: size,
+                        maxDim: maxDim
+                    });
+                    
+                    // 根据点云大小设置合适的相机距离和视口
+                    // 距离应该是点云最大尺寸的 2-3 倍
+                    const distance = maxDim > 0 ? maxDim * 2.0 : 50;
+                    
+                    // 设置相机位置，确保能看到整个点云
+                    camera.position.set(
+                        center.x + distance * 0.7,
+                        center.y + distance * 0.7,
+                        center.z + distance * 0.7
+                    );
+                    camera.lookAt(center);
+                    
+                    // 更新相机的近远裁剪平面
+                    camera.near = Math.max(0.1, distance * 0.01);
+                    camera.far = Math.max(1000, distance * 10);
+                    
+                    // 如果是正交相机，根据点云大小调整视口
+                    if (camera instanceof THREE.OrthographicCamera) {
+                        const aspect = renderer.domElement.clientWidth / renderer.domElement.clientHeight || 1;
+                        const viewSize = maxDim > 0 ? maxDim * 1.5 : 100; // 视口大小约为点云最大尺寸的1.5倍
+                        const halfWidth = viewSize * aspect;
+                        const halfHeight = viewSize;
+                        camera.left = -halfWidth;
+                        camera.right = halfWidth;
+                        camera.top = halfHeight;
+                        camera.bottom = -halfHeight;
+                    }
+                    camera.updateProjectionMatrix();
+                    
+                    console.log('相机位置:', camera.position);
+                    console.log('相机目标:', center);
+                    console.log('相机距离:', distance);
+                    
+                    if (controls && controls.target) {
+                        controls.target.copy(center);
+                        controls.minDistance = distance * 0.1;
+                        controls.maxDistance = distance * 5;
+                        controls.update();
+                    } else {
+                        // 如果controls未初始化，尝试重新初始化
+                        console.warn('Controls未初始化，尝试重新初始化...');
+                        setTimeout(function() {
+                            if (typeof THREE.OrbitControls !== 'undefined' && !controls) {
+                                controls = new THREE.OrbitControls(camera, renderer.domElement);
+                                controls.enableDamping = true;
+                                controls.dampingFactor = 0.05;
+                                controls.enablePan = true;
+                                controls.enableZoom = true;
+                                controls.enableRotate = true;
+                                controls.target.copy(center);
+                                controls.minDistance = distance * 0.1;
+                                controls.maxDistance = distance * 5;
+                                console.log('Controls已重新初始化');
+                            }
+                        }, 100);
+                    }
+                }
+                
+                // 确保canvas可以接收鼠标事件
+                if (renderer && renderer.domElement) {
+                    renderer.domElement.style.pointerEvents = 'auto';
+                    renderer.domElement.style.cursor = 'grab';
+                }
+                
+                updateStatus(`成功加载 ${data.count} 个点`, 'success');
+                showLoading(false);
+                
+                // 加载点云后自动应用保存的变换配置
+                setTimeout(() => {
+                    const config = {
+                        x: parseFloat(document.getElementById('transformX').value) || 0,
+                        y: parseFloat(document.getElementById('transformY').value) || 0,
+                        z: parseFloat(document.getElementById('transformZ').value) || 0,
+                        roll: parseFloat(document.getElementById('transformRoll').value) || 0,
+                        pitch: parseFloat(document.getElementById('transformPitch').value) || 0,
+                        yaw: parseFloat(document.getElementById('transformYaw').value) || 0
+                    };
+                    
+                    // 如果有非零的变换值，自动应用
+                    if (config.x !== 0 || config.y !== 0 || config.z !== 0 || 
+                        config.roll !== 0 || config.pitch !== 0 || config.yaw !== 0) {
+                        applyTransform();
+                    }
+                }, 100);
+                
+            } catch (error) {
+                updateStatus('错误: ' + error.message, 'error');
+                showLoading(false);
+                console.error('加载点云失败:', error);
+            }
+        }
+
+        // 文件选择处理
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const fileName = file.name.toLowerCase();
+            if (!fileName.endsWith('.pcd') && !fileName.endsWith('.bin')) {
+                updateStatus('错误: 请选择 .pcd 或 .bin 文件', 'error');
+                return;
+            }
+            
+            // 显示文件信息
+            document.getElementById('fileName').textContent = file.name;
+            document.getElementById('fileSize').textContent = formatFileSize(file.size);
+            document.getElementById('fileInfo').style.display = 'inline-block';
+            
+            // 加载点云
+            loadPointCloud(file);
+        });
+
+        // 拖拽上传
+        const viewer = document.getElementById('viewer');
+        viewer.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        });
+
+        viewer.addEventListener('drop', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const file = e.dataTransfer.files[0];
+            const fileName = file ? file.name.toLowerCase() : '';
+            if (file && (fileName.endsWith('.pcd') || fileName.endsWith('.bin'))) {
+                document.getElementById('fileInput').files = e.dataTransfer.files;
+                document.getElementById('fileName').textContent = file.name;
+                document.getElementById('fileSize').textContent = formatFileSize(file.size);
+                document.getElementById('fileInfo').style.display = 'inline-block';
+                loadPointCloud(file);
+            } else {
+                updateStatus('错误: 请拖拽 .pcd 或 .bin 文件', 'error');
+            }
+        });
+
+        // 工具函数
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        }
+
+        function updateStatus(message, type) {
+            const status = document.getElementById('status');
+            status.textContent = message;
+            status.className = 'status ' + type;
+        }
+
+        function showLoading(show) {
+            document.getElementById('loading').classList.toggle('show', show);
+        }
+
+        function updatePointSize(value) {
+            const sizeValue = parseFloat(value);
+            document.getElementById('pointSizeValue').textContent = sizeValue.toFixed(1);
+            if (pointCloud) {
+                // 如果点云很大，需要根据边界框调整
+                const geometry = pointCloud.geometry;
+                if (geometry.boundingBox) {
+                    const size = geometry.boundingBox.getSize(new THREE.Vector3());
+                    const maxDim = Math.max(size.x, size.y, size.z);
+                    let adjustedSize = sizeValue;
+                    if (maxDim > 100) {
+                        adjustedSize = Math.max(0.1, sizeValue * (100 / maxDim));
+                    }
+                    pointCloud.material.size = adjustedSize;
+                } else {
+                    pointCloud.material.size = sizeValue;
+                }
+            }
+        }
+
+        function updateOpacity(value) {
+            const percent = Math.round(parseFloat(value) * 100);
+            document.getElementById('opacityValue').textContent = percent + '%';
+            if (pointCloud) {
+                pointCloud.material.opacity = parseFloat(value);
+            }
+        }
+
+        function updateBackground(color) {
+            scene.background = new THREE.Color(color);
+        }
+
+        function resetView() {
+            if (pointCloud && controls) {
+                const geometry = pointCloud.geometry;
+                geometry.computeBoundingBox();
+                const box = geometry.boundingBox;
+                
+                if (box) {
+                    const center = box.getCenter(new THREE.Vector3());
+                    const size = box.getSize(new THREE.Vector3());
+                    const maxDim = Math.max(size.x, size.y, size.z);
+                    const distance = maxDim > 0 ? maxDim * 1.5 : 50;
+                    
+                    camera.position.set(
+                        center.x + distance,
+                        center.y + distance,
+                        center.z + distance
+                    );
+                    camera.lookAt(center);
+                    
+                    // 如果是正交相机，根据点云大小调整视口
+                    if (camera instanceof THREE.OrthographicCamera) {
+                        const aspect = renderer.domElement.clientWidth / renderer.domElement.clientHeight || 1;
+                        const viewSize = maxDim > 0 ? maxDim * 1.5 : 100;
+                        const halfWidth = viewSize * aspect;
+                        const halfHeight = viewSize;
+                        camera.left = -halfWidth;
+                        camera.right = halfWidth;
+                        camera.top = halfHeight;
+                        camera.bottom = -halfHeight;
+                        camera.updateProjectionMatrix();
+                    }
+                    
+                    if (controls && controls.target) {
+                        controls.target.copy(center);
+                        controls.update();
+                    }
+                } else {
+                    camera.position.set(50, 50, 50);
+                    camera.lookAt(0, 0, 0);
+                    if (controls && controls.target) {
+                        controls.target.set(0, 0, 0);
+                        controls.update();
+                    }
+                }
+            } else if (controls && controls.target) {
+                camera.position.set(50, 50, 50);
+                camera.lookAt(0, 0, 0);
+                controls.target.set(0, 0, 0);
+                controls.update();
+            }
+        }
+
+        function toggleGrid() {
+            if (gridHelper) {
+                gridVisible = !gridVisible;
+                gridHelper.visible = gridVisible;
+            }
+        }
+
+        // 调整变换参数并自动应用
+        function adjustTransform(inputId, delta, isAngle) {
+            const input = document.getElementById(inputId);
+            if (!input) return;
+            
+            let currentValue = parseFloat(input.value) || 0;
+            
+            if (isAngle) {
+                // 对于角度：每次加减 0.1 度（转换为弧度：0.1 * π / 180）
+                // 但界面上显示的是度数，所以直接加减 0.1 度
+                currentValue += delta;
+            } else {
+                // 对于位置：每次加减 0.1
+                currentValue += delta;
+            }
+            
+            // 更新输入框值，保留1位小数
+            input.value = currentValue.toFixed(1);
+            
+            // 自动应用变换
+            applyTransform();
+            
+            // 保存配置
+            saveTransformConfig();
+        }
+
+        // 保存变换配置到 localStorage
+        function saveTransformConfig() {
+            const config = {
+                x: parseFloat(document.getElementById('transformX').value) || 0,
+                y: parseFloat(document.getElementById('transformY').value) || 0,
+                z: parseFloat(document.getElementById('transformZ').value) || 0,
+                roll: parseFloat(document.getElementById('transformRoll').value) || 0,
+                pitch: parseFloat(document.getElementById('transformPitch').value) || 0,
+                yaw: parseFloat(document.getElementById('transformYaw').value) || 0
+            };
+
+            // 保存到 localStorage
+            try {
+                localStorage.setItem('pointcloud_transform_config', JSON.stringify(config));
+                console.log('配置已保存到本地存储:', config);
+            } catch (e) {
+                console.error('保存配置失败:', e);
+            }
+        }
+
+        // 加载变换配置
+        function loadTransformConfig() {
+            let config = {
+                x: 0,
+                y: 0,
+                z: 0,
+                roll: 0,
+                pitch: 0,
+                yaw: 0
+            };
+
+            // 从 localStorage 加载
+            try {
+                const localConfig = localStorage.getItem('pointcloud_transform_config');
+                if (localConfig) {
+                    const parsed = JSON.parse(localConfig);
+                    if (parsed && typeof parsed === 'object') {
+                        config = { ...config, ...parsed };
+                        console.log('从本地存储加载配置:', config);
+                    }
+                } else {
+                    console.log('未找到保存的配置，使用默认值（全为0）');
+                }
+            } catch (e) {
+                console.error('解析本地配置失败，使用默认值:', e);
+            }
+
+            // 更新输入框
+            document.getElementById('transformX').value = config.x.toFixed(1);
+            document.getElementById('transformY').value = config.y.toFixed(1);
+            document.getElementById('transformZ').value = config.z.toFixed(1);
+            document.getElementById('transformRoll').value = config.roll.toFixed(1);
+            document.getElementById('transformPitch').value = config.pitch.toFixed(1);
+            document.getElementById('transformYaw').value = config.yaw.toFixed(1);
+
+            return config;
+        }
+
+        // 点云变换函数（参考 C++ 代码）
+        function transformPoint(x, y, z, transform) {
+            // 将角度转换为弧度
+            // transform.roll, pitch, yaw 在界面上是度数，需要转换为弧度
+            const roll = transform.roll * Math.PI / 180;
+            const pitch = transform.pitch * Math.PI / 180;
+            const yaw = transform.yaw * Math.PI / 180;
+
+            const cosa = Math.cos(roll);
+            const sina = Math.sin(roll);
+            const cosb = Math.cos(pitch);
+            const sinb = Math.sin(pitch);
+            const cosc = Math.cos(yaw);
+            const sinc = Math.sin(yaw);
+
+            const x_ = cosb * cosc * x + (sina * sinb * cosc - cosa * sinc) * y +
+                        (sina * sinc + cosa * sinb * cosc) * z + transform.x;
+            const y_ = cosb * sinc * x + (cosa * cosc + sina * sinb * sinc) * y +
+                        (cosa * sinb * sinc - sina * cosc) * z + transform.y;
+            const z_ = -sinb * x + sina * cosb * y + cosa * cosb * z + transform.z;
+
+            return { x: x_, y: y_, z: z_ };
+        }
+
+        // 应用变换
+        function applyTransform() {
+            if (!pointCloud || !originalPositions) {
+                updateStatus('错误: 请先加载点云文件', 'error');
+                return;
+            }
+
+            // 获取变换参数
+            const transform = {
+                x: parseFloat(document.getElementById('transformX').value) || 0,
+                y: parseFloat(document.getElementById('transformY').value) || 0,
+                z: parseFloat(document.getElementById('transformZ').value) || 0,
+                roll: parseFloat(document.getElementById('transformRoll').value) || 0,
+                pitch: parseFloat(document.getElementById('transformPitch').value) || 0,
+                yaw: parseFloat(document.getElementById('transformYaw').value) || 0
+            };
+
+            console.log('应用变换:', transform);
+
+            // 应用变换到所有点
+            const geometry = pointCloud.geometry;
+            const positions = geometry.attributes.position.array;
+            const pointCount = originalPositions.length / 3;
+
+            for (let i = 0; i < pointCount; i++) {
+                const x = originalPositions[i * 3];
+                const y = originalPositions[i * 3 + 1];
+                const z = originalPositions[i * 3 + 2];
+
+                const transformed = transformPoint(x, y, z, transform);
+
+                positions[i * 3] = transformed.x;
+                positions[i * 3 + 1] = transformed.y;
+                positions[i * 3 + 2] = transformed.z;
+            }
+
+            // 更新几何体
+            geometry.attributes.position.needsUpdate = true;
+            geometry.computeBoundingBox();
+
+            // 不重置视角，保持当前相机位置和角度
+            // 只更新 controls 的目标点（如果需要）
+            const box = geometry.boundingBox;
+            if (box && controls && controls.target) {
+                const center = box.getCenter(new THREE.Vector3());
+                // 只更新目标点，不改变相机位置
+                controls.target.copy(center);
+                controls.update();
+            }
+
+            updateStatus('变换已应用', 'success');
+            
+            // 保存配置
+            saveTransformConfig();
+        }
+
+        // 重置变换
+        function resetTransform() {
+            if (!pointCloud || !originalPositions) {
+                updateStatus('错误: 请先加载点云文件', 'error');
+                return;
+            }
+
+            // 重置输入框
+            document.getElementById('transformX').value = 0;
+            document.getElementById('transformY').value = 0;
+            document.getElementById('transformZ').value = 0;
+            document.getElementById('transformRoll').value = 0;
+            document.getElementById('transformPitch').value = 0;
+            document.getElementById('transformYaw').value = 0;
+
+            // 恢复原始位置
+            const geometry = pointCloud.geometry;
+            const positions = geometry.attributes.position.array;
+            
+            for (let i = 0; i < originalPositions.length; i++) {
+                positions[i] = originalPositions[i];
+            }
+
+            // 更新几何体
+            geometry.attributes.position.needsUpdate = true;
+            geometry.computeBoundingBox();
+
+            // 更新相机位置
+            const box = geometry.boundingBox;
+            if (box) {
+                const center = box.getCenter(new THREE.Vector3());
+                const size = box.getSize(new THREE.Vector3());
+                const maxDim = Math.max(size.x, size.y, size.z);
+                const distance = maxDim > 0 ? maxDim * 2.0 : 50;
+
+                camera.position.set(
+                    center.x + distance * 0.7,
+                    center.y + distance * 0.7,
+                    center.z + distance * 0.7
+                );
+                camera.lookAt(center);
+                
+                // 如果是正交相机，根据点云大小调整视口
+                if (camera instanceof THREE.OrthographicCamera) {
+                    const aspect = renderer.domElement.clientWidth / renderer.domElement.clientHeight || 1;
+                    const viewSize = maxDim > 0 ? maxDim * 1.5 : 100;
+                    const halfWidth = viewSize * aspect;
+                    const halfHeight = viewSize;
+                    camera.left = -halfWidth;
+                    camera.right = halfWidth;
+                    camera.top = halfHeight;
+                    camera.bottom = -halfHeight;
+                    camera.updateProjectionMatrix();
+                }
+
+                if (controls && controls.target) {
+                    controls.target.copy(center);
+                    controls.update();
+                }
+            }
+
+            updateStatus('变换已重置', 'success');
+            
+            // 保存配置
+            saveTransformConfig();
+        }
+
+        // ==================== 地平面计算功能 ====================
+        
+        // 计算地平面（使用RANSAC算法，参考C++代码segment_plane_ransac）
+        // 只使用变换后的点云数据
+        // 使用异步分批处理避免阻塞UI
+        function calculateGroundPlane() {
+            if (!pointCloud || !originalPositions) {
+                updateStatus('错误: 请先加载点云文件', 'error');
+                return;
+            }
+
+            showLoading(true);
+            updateStatus('正在计算地平面...', 'info');
+
+            try {
+                // 获取当前变换后的点云数据
+                const geometry = pointCloud.geometry;
+                const positions = geometry.attributes.position.array;
+                const pointCount = positions.length / 3;
+
+                if (pointCount < 3) {
+                    updateStatus('错误: 点云数据不足', 'error');
+                    showLoading(false);
+                    return;
+                }
+
+                // RANSAC参数
+                const distanceThreshold = 0.05; // 距离阈值（米）
+                // 根据点云数量动态调整迭代次数，避免过多计算
+                const numIterations = Math.min(50000, Math.max(10000, Math.floor(pointCount / 10)));
+                
+                // 如果点云太大，进行采样以提高性能
+                const maxSamplePoints = 50000;
+                let samplePositions = positions;
+                let samplePointCount = pointCount;
+                
+                if (pointCount > maxSamplePoints) {
+                    // 均匀采样
+                    const step = Math.floor(pointCount / maxSamplePoints);
+                    samplePositions = new Float32Array(maxSamplePoints * 3);
+                    for (let i = 0; i < maxSamplePoints; i++) {
+                        const srcIdx = i * step;
+                        samplePositions[i * 3] = positions[srcIdx * 3];
+                        samplePositions[i * 3 + 1] = positions[srcIdx * 3 + 1];
+                        samplePositions[i * 3 + 2] = positions[srcIdx * 3 + 2];
+                    }
+                    samplePointCount = maxSamplePoints;
+                    updateStatus(`点云较大，采样到 ${maxSamplePoints} 个点进行计算...`, 'info');
+                }
+                
+                let bestInliers = 0;
+                let bestA = 0, bestB = 0, bestC = 0, bestD = 0;
+                let currentIter = 0;
+
+                // 随机数生成器
+                const getRandomInt = (max) => Math.floor(Math.random() * max);
+
+                // 使用异步分批处理，避免阻塞UI
+                const batchSize = 100; // 每批处理100次迭代
+                
+                const processBatch = () => {
+                    const startIter = currentIter;
+                    const endIter = Math.min(currentIter + batchSize, numIterations);
+                    
+                    for (let iter = startIter; iter < endIter; iter++) {
+                        // 随机选择3个点
+                        let idx1 = getRandomInt(samplePointCount);
+                        let idx2 = getRandomInt(samplePointCount);
+                        let idx3 = getRandomInt(samplePointCount);
+
+                        // 确保选择不同的点
+                        while (idx2 === idx1) idx2 = getRandomInt(samplePointCount);
+                        while (idx3 === idx1 || idx3 === idx2) idx3 = getRandomInt(samplePointCount);
+
+                        // 获取三个点
+                        const p1 = {
+                            x: samplePositions[idx1 * 3],
+                            y: samplePositions[idx1 * 3 + 1],
+                            z: samplePositions[idx1 * 3 + 2]
+                        };
+                        const p2 = {
+                            x: samplePositions[idx2 * 3],
+                            y: samplePositions[idx2 * 3 + 1],
+                            z: samplePositions[idx2 * 3 + 2]
+                        };
+                        const p3 = {
+                            x: samplePositions[idx3 * 3],
+                            y: samplePositions[idx3 * 3 + 1],
+                            z: samplePositions[idx3 * 3 + 2]
+                        };
+
+                        // 计算平面方程 ax + by + cz + d = 0
+                        // 向量 v1 = p2 - p1, v2 = p3 - p1
+                        const v1x = p2.x - p1.x;
+                        const v1y = p2.y - p1.y;
+                        const v1z = p2.z - p1.z;
+
+                        const v2x = p3.x - p1.x;
+                        const v2y = p3.y - p1.y;
+                        const v2z = p3.z - p1.z;
+
+                        // 法向量 n = v1 × v2 (叉积)
+                        let nx = v1y * v2z - v1z * v2y;
+                        let ny = v1z * v2x - v1x * v2z;
+                        let nz = v1x * v2y - v1y * v2x;
+
+                        // 归一化法向量
+                        const norm = Math.sqrt(nx * nx + ny * ny + nz * nz);
+                        if (norm < 1e-6) continue; // 退化情况
+
+                        nx /= norm;
+                        ny /= norm;
+                        nz /= norm;
+
+                        // 计算 d = -(nx*p1x + ny*p1y + nz*p1z)
+                        const d = -(nx * p1.x + ny * p1.y + nz * p1.z);
+
+                        // 统计内点（使用采样后的点云）
+                        let inliers = 0;
+                        for (let i = 0; i < samplePointCount; i++) {
+                            const px = samplePositions[i * 3];
+                            const py = samplePositions[i * 3 + 1];
+                            const pz = samplePositions[i * 3 + 2];
+                            
+                            // 点到平面的距离
+                            const dist = Math.abs(nx * px + ny * py + nz * pz + d);
+                            if (dist <= distanceThreshold) {
+                                inliers++;
+                            }
+                        }
+
+                        // 更新最佳模型
+                        if (inliers > bestInliers) {
+                            bestInliers = inliers;
+                            bestA = nx;
+                            bestB = ny;
+                            bestC = nz;
+                            bestD = d;
+                        }
+                    }
+                    
+                    currentIter = endIter;
+                    
+                    // 更新进度
+                    const progress = ((currentIter / numIterations) * 100).toFixed(1);
+                    updateStatus(`正在计算地平面... ${progress}%`, 'info');
+                    
+                    // 如果还有迭代未完成，继续下一批
+                    if (currentIter < numIterations) {
+                        // 使用setTimeout让出控制权，避免阻塞UI
+                        setTimeout(processBatch, 0);
+                    } else {
+                        // 计算完成
+                        // 确保法向量向上（b > 0）
+                        if (bestB < 0) {
+                            bestA = -bestA;
+                            bestB = -bestB;
+                            bestC = -bestC;
+                            bestD = -bestD;
+                        }
+
+                        // 显示结果
+                        const resultDiv = document.getElementById('groundPlaneResult');
+                        if (resultDiv) {
+                            const inlierRatio = ((bestInliers / samplePointCount) * 100).toFixed(2);
+                            
+                            // 生成JSON格式，与config-inno.json格式一致
+                            const jsonOutput = `"ground_plane": {
+    "a":  ${bestA.toFixed(6)},
+    "b":  ${bestB.toFixed(6)},
+    "c":  ${bestC.toFixed(6)},
+    "d":  ${bestD.toFixed(6)}
+}`;
+                            
+                            resultDiv.innerHTML = `
+                                <div style="color: #4caf50; font-weight: bold; margin-bottom: 8px;">地平面计算完成</div>
+                                <div style="font-size: 11px; color: #aaa; margin-bottom: 8px;">
+                                    内点: ${bestInliers} / ${samplePointCount} (${inlierRatio}%)
+                                    ${pointCount > maxSamplePoints ? `<br>（已采样，原始点云: ${pointCount} 个点）` : ''}
+                                </div>
+                                <div style="margin-top: 10px;">
+                                    <div style="font-size: 10px; color: #888; margin-bottom: 5px;">JSON格式（点击下方文本框可全选复制）:</div>
+                                    <textarea readonly style="width: 100%; min-height: 80px; padding: 8px; background: rgba(26, 26, 38, 0.8); border: 1px solid rgba(102, 126, 234, 0.3); border-radius: 8px; color: #e0e0e0; font-family: 'Courier New', monospace; font-size: 11px; line-height: 1.5; resize: vertical; cursor: text;" onclick="this.select();">${jsonOutput}</textarea>
+                                </div>
+                            `;
+                        }
+
+                        updateStatus(`地平面计算完成: a=${bestA.toFixed(4)}, b=${bestB.toFixed(4)}, c=${bestC.toFixed(4)}, d=${bestD.toFixed(4)}`, 'success');
+                        showLoading(false);
+                    }
+                };
+                
+                // 开始处理
+                processBatch();
+
+            } catch (error) {
+                updateStatus('错误: ' + error.message, 'error');
+                showLoading(false);
+                console.error('计算地平面失败:', error);
+                
+                const resultDiv = document.getElementById('groundPlaneResult');
+                if (resultDiv) {
+                    resultDiv.innerHTML = '<span style="color: #f44336;">计算失败: ' + error.message + '</span>';
+                }
+            }
+        }
+
+        // ==================== 框体管理功能 ====================
+        
+        // 创建3D框体（不随点云变换）
+        // 完全参考 C++ 代码 draw_meshlab.hpp 中的 boxCorners 函数
+        // w: x方向（宽度），l: y方向（长度），h: z方向（高度）
+        // rt: 绕Z轴旋转角度（在XY平面内旋转，单位：度）
+        function createBoxMesh(x, y, z, w, l, h, rt) {
+            // 计算半尺寸
+            const hw = w * 0.5;
+            const hl = l * 0.5;
+            const hh = h * 0.5;
+            
+            // 旋转角度（转换为弧度）
+            const yaw = rt * Math.PI / 180;
+            const cosr = Math.cos(yaw);
+            const sinr = Math.sin(yaw);
+            
+            // 旋转函数（在XY平面内）
+            const rot = (x, y) => {
+                return {
+                    x: x * cosr - y * sinr,
+                    y: x * sinr + y * cosr
+                };
+            };
+            
+            // 计算8个角点（完全按照C++代码逻辑）
+            const p0 = rot(-hw, -hl);
+            const p1 = rot( hw, -hl);
+            const p2 = rot( hw,  hl);
+            const p3 = rot(-hw,  hl);
+            
+            const z0 = z; // 底部
+            const z1 = z + h; // 顶部
+            
+            // 8个角点坐标
+            const corners = [
+                new THREE.Vector3(x + p0.x, y + p0.y, z0), // 0
+                new THREE.Vector3(x + p1.x, y + p1.y, z0), // 1
+                new THREE.Vector3(x + p2.x, y + p2.y, z0), // 2
+                new THREE.Vector3(x + p3.x, y + p3.y, z0), // 3
+                new THREE.Vector3(x + p0.x, y + p0.y, z1), // 4
+                new THREE.Vector3(x + p1.x, y + p1.y, z1), // 5
+                new THREE.Vector3(x + p2.x, y + p2.y, z1), // 6
+                new THREE.Vector3(x + p3.x, y + p3.y, z1)  // 7
+            ];
+            
+            // 创建线框几何体（12条边）
+            const geometry = new THREE.BufferGeometry();
+            const vertices = [];
+            
+            // 底部4条边
+            vertices.push(corners[0].x, corners[0].y, corners[0].z);
+            vertices.push(corners[1].x, corners[1].y, corners[1].z);
+            vertices.push(corners[1].x, corners[1].y, corners[1].z);
+            vertices.push(corners[2].x, corners[2].y, corners[2].z);
+            vertices.push(corners[2].x, corners[2].y, corners[2].z);
+            vertices.push(corners[3].x, corners[3].y, corners[3].z);
+            vertices.push(corners[3].x, corners[3].y, corners[3].z);
+            vertices.push(corners[0].x, corners[0].y, corners[0].z);
+            
+            // 顶部4条边
+            vertices.push(corners[4].x, corners[4].y, corners[4].z);
+            vertices.push(corners[5].x, corners[5].y, corners[5].z);
+            vertices.push(corners[5].x, corners[5].y, corners[5].z);
+            vertices.push(corners[6].x, corners[6].y, corners[6].z);
+            vertices.push(corners[6].x, corners[6].y, corners[6].z);
+            vertices.push(corners[7].x, corners[7].y, corners[7].z);
+            vertices.push(corners[7].x, corners[7].y, corners[7].z);
+            vertices.push(corners[4].x, corners[4].y, corners[4].z);
+            
+            // 4条垂直边
+            vertices.push(corners[0].x, corners[0].y, corners[0].z);
+            vertices.push(corners[4].x, corners[4].y, corners[4].z);
+            vertices.push(corners[1].x, corners[1].y, corners[1].z);
+            vertices.push(corners[5].x, corners[5].y, corners[5].z);
+            vertices.push(corners[2].x, corners[2].y, corners[2].z);
+            vertices.push(corners[6].x, corners[6].y, corners[6].z);
+            vertices.push(corners[3].x, corners[3].y, corners[3].z);
+            vertices.push(corners[7].x, corners[7].y, corners[7].z);
+            
+            geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
+            
+            // 创建线框材质
+            const material = new THREE.LineBasicMaterial({ 
+                color: 0x00ff00,
+                transparent: true,
+                opacity: 0.8
+            });
+            
+            // 创建线框对象
+            const boxMesh = new THREE.LineSegments(geometry, material);
+            
+            return boxMesh;
+        }
+
+        // 添加默认框体（不可编辑）
+        function addDefaultBox() {
+            if (defaultBoxId !== -1) {
+                // 默认框体已存在
+                return;
+            }
+            
+            const boxId = boxIdCounter++;
+            defaultBoxId = boxId;
+            
+            // 默认框体参数（固定值）
+            const defaultParams = {
+                x: 34.560,
+                y: 0.000,
+                z: -3.000,
+                w: 69.120,
+                l: 79.360,
+                h: 4.000,
+                rt: 0.000
+            };
+            
+            const boxMesh = createBoxMesh(
+                defaultParams.x, defaultParams.y, defaultParams.z,
+                defaultParams.w, defaultParams.l, defaultParams.h,
+                defaultParams.rt
+            );
+            
+            scene.add(boxMesh);
+            
+            const box = {
+                id: boxId,
+                mesh: boxMesh,
+                params: defaultParams,
+                isDefault: true
+            };
+            
+            boxes.push(box);
+            updateBoxesList();
+        }
+
+        // 添加新框体
+        function addNewBox() {
+            const boxId = boxIdCounter++;
+            const defaultParams = {
+                x: 0, y: 0, z: 0,
+                w: 1, l: 1, h: 1,
+                rt: 0
+            };
+            
+            const boxMesh = createBoxMesh(
+                defaultParams.x, defaultParams.y, defaultParams.z,
+                defaultParams.w, defaultParams.l, defaultParams.h,
+                defaultParams.rt
+            );
+            
+            scene.add(boxMesh);
+            
+            const box = {
+                id: boxId,
+                mesh: boxMesh,
+                params: defaultParams,
+                isDefault: false
+            };
+            
+            boxes.push(box);
+            updateBoxesList();
+            saveBoxesConfig(); // 保存配置
+        }
+
+        // 更新框体列表显示
+        function updateBoxesList() {
+            const boxesList = document.getElementById('boxesList');
+            if (!boxesList) return;
+            boxesList.innerHTML = '';
+            
+            boxes.forEach((box, index) => {
+                const isDefault = box.isDefault || false;
+                const disabledAttr = isDefault ? 'disabled' : '';
+                const readonlyAttr = isDefault ? 'readonly' : '';
+                const titleText = isDefault ? '默认框体' : `框体 ${index}`;
+                const deleteButton = isDefault ? '' : `<button class="btn btn-sm btn-danger" onclick="deleteBox(${box.id})" style="padding: 2px 6px; font-size: 10px;">删除</button>`;
+                
+                const boxItem = document.createElement('div');
+                boxItem.className = 'box-item';
+                boxItem.innerHTML = `
+                    <div class="box-header">
+                        <span class="box-title">${titleText}</span>
+                        ${deleteButton}
+                    </div>
+                    <div class="box-params">
+                        <div class="param-group">
+                            <span class="param-label">X:</span>
+                            <input type="number" class="param-input" value="${box.params.x.toFixed(3)}" step="0.1" 
+                                   id="box_${box.id}_x" ${readonlyAttr} onchange="updateBoxParam(${box.id}, 'x', this.value)">
+                            <button class="btn btn-sm" ${disabledAttr} onclick="adjustBoxParam(${box.id}, 'x', -0.1)">-</button>
+                            <button class="btn btn-sm" ${disabledAttr} onclick="adjustBoxParam(${box.id}, 'x', 0.1)">+</button>
+                            <button class="btn btn-sm" ${disabledAttr} onclick="adjustBoxParam(${box.id}, 'x', -1)">--</button>
+                        </div>
+                        <div class="param-group">
+                            <span class="param-label">Y:</span>
+                            <input type="number" class="param-input" value="${box.params.y.toFixed(3)}" step="0.1" 
+                                   id="box_${box.id}_y" ${readonlyAttr} onchange="updateBoxParam(${box.id}, 'y', this.value)">
+                            <button class="btn btn-sm" ${disabledAttr} onclick="adjustBoxParam(${box.id}, 'y', -0.1)">-</button>
+                            <button class="btn btn-sm" ${disabledAttr} onclick="adjustBoxParam(${box.id}, 'y', 0.1)">+</button>
+                            <button class="btn btn-sm" ${disabledAttr} onclick="adjustBoxParam(${box.id}, 'y', -1)">--</button>
+                        </div>
+                        <div class="param-group">
+                            <span class="param-label">Z:</span>
+                            <input type="number" class="param-input" value="${box.params.z.toFixed(3)}" step="0.1" 
+                                   id="box_${box.id}_z" ${readonlyAttr} onchange="updateBoxParam(${box.id}, 'z', this.value)">
+                            <button class="btn btn-sm" ${disabledAttr} onclick="adjustBoxParam(${box.id}, 'z', -0.1)">-</button>
+                            <button class="btn btn-sm" ${disabledAttr} onclick="adjustBoxParam(${box.id}, 'z', 0.1)">+</button>
+                            <button class="btn btn-sm" ${disabledAttr} onclick="adjustBoxParam(${box.id}, 'z', -1)">--</button>
+                        </div>
+                        <div class="param-group">
+                            <span class="param-label">宽:</span>
+                            <input type="number" class="param-input" value="${box.params.w.toFixed(3)}" step="0.1" 
+                                   id="box_${box.id}_w" ${readonlyAttr} onchange="updateBoxParam(${box.id}, 'w', this.value)">
+                            <button class="btn btn-sm" ${disabledAttr} onclick="adjustBoxParam(${box.id}, 'w', -0.1)">-</button>
+                            <button class="btn btn-sm" ${disabledAttr} onclick="adjustBoxParam(${box.id}, 'w', 0.1)">+</button>
+                            <button class="btn btn-sm" ${disabledAttr} onclick="adjustBoxParam(${box.id}, 'w', -1)">--</button>
+                        </div>
+                        <div class="param-group">
+                            <span class="param-label">长:</span>
+                            <input type="number" class="param-input" value="${box.params.l.toFixed(3)}" step="0.1" 
+                                   id="box_${box.id}_l" ${readonlyAttr} onchange="updateBoxParam(${box.id}, 'l', this.value)">
+                            <button class="btn btn-sm" ${disabledAttr} onclick="adjustBoxParam(${box.id}, 'l', -0.1)">-</button>
+                            <button class="btn btn-sm" ${disabledAttr} onclick="adjustBoxParam(${box.id}, 'l', 0.1)">+</button>
+                            <button class="btn btn-sm" ${disabledAttr} onclick="adjustBoxParam(${box.id}, 'l', -1)">--</button>
+                        </div>
+                        <div class="param-group">
+                            <span class="param-label">高:</span>
+                            <input type="number" class="param-input" value="${box.params.h.toFixed(3)}" step="0.1" 
+                                   id="box_${box.id}_h" ${readonlyAttr} onchange="updateBoxParam(${box.id}, 'h', this.value)">
+                            <button class="btn btn-sm" ${disabledAttr} onclick="adjustBoxParam(${box.id}, 'h', -0.1)">-</button>
+                            <button class="btn btn-sm" ${disabledAttr} onclick="adjustBoxParam(${box.id}, 'h', 0.1)">+</button>
+                            <button class="btn btn-sm" ${disabledAttr} onclick="adjustBoxParam(${box.id}, 'h', -1)">--</button>
+                        </div>
+                        <div class="param-group">
+                            <span class="param-label">角度:</span>
+                            <input type="number" class="param-input" value="${box.params.rt.toFixed(3)}" step="1" 
+                                   id="box_${box.id}_rt" ${readonlyAttr} onchange="updateBoxParam(${box.id}, 'rt', this.value)">
+                            <button class="btn btn-sm" ${disabledAttr} onclick="adjustBoxParam(${box.id}, 'rt', -1)">-</button>
+                            <button class="btn btn-sm" ${disabledAttr} onclick="adjustBoxParam(${box.id}, 'rt', 1)">+</button>
+                            <button class="btn btn-sm" ${disabledAttr} onclick="adjustBoxParam(${box.id}, 'rt', -10)">--</button>
+                        </div>
+                    </div>
+                `;
+                boxesList.appendChild(boxItem);
+            });
+        }
+
+        // 调整框体参数（带+/-按钮）
+        function adjustBoxParam(boxId, param, delta) {
+            const box = boxes.find(b => b.id === boxId);
+            if (!box || box.isDefault) return; // 不允许修改默认框体
+            
+            const currentValue = box.params[param] || 0;
+            const newValue = currentValue + delta;
+            
+            // 更新参数
+            box.params[param] = newValue;
+            
+            // 更新输入框显示
+            const input = document.getElementById(`box_${boxId}_${param}`);
+            if (input) {
+                input.value = newValue.toFixed(3);
+            }
+            
+            // 更新3D框体
+            updateBoxMesh(box);
+            saveBoxesConfig(); // 保存配置
+        }
+
+        // 更新框体参数
+        function updateBoxParam(boxId, param, value) {
+            const box = boxes.find(b => b.id === boxId);
+            if (!box || box.isDefault) return; // 不允许修改默认框体
+            
+            const numValue = parseFloat(value) || 0;
+            box.params[param] = numValue;
+            
+            // 更新3D框体
+            updateBoxMesh(box);
+            saveBoxesConfig(); // 保存配置
+        }
+
+        // 更新框体3D网格
+        function updateBoxMesh(box) {
+            scene.remove(box.mesh);
+            box.mesh.geometry.dispose();
+            box.mesh.material.dispose();
+            box.mesh = createBoxMesh(
+                box.params.x, box.params.y, box.params.z,
+                box.params.w, box.params.l, box.params.h,
+                box.params.rt
+            );
+            scene.add(box.mesh);
+        }
+
+        // 删除框体
+        function deleteBox(boxId) {
+            const box = boxes.find(b => b.id === boxId);
+            if (!box || box.isDefault) return; // 不允许删除默认框体
+            
+            const index = boxes.findIndex(b => b.id === boxId);
+            if (index === -1) return;
+            
+            scene.remove(box.mesh);
+            box.mesh.geometry.dispose();
+            box.mesh.material.dispose();
+            boxes.splice(index, 1);
+            updateBoxesList();
+            saveBoxesConfig(); // 保存配置
+        }
+
+        // 显示导入框体对话框
+        function showImportBoxDialog() {
+            document.getElementById('importBoxModal').classList.add('show');
+        }
+
+        // 关闭导入框体对话框
+        function closeImportBoxDialog() {
+            document.getElementById('importBoxModal').classList.remove('show');
+        }
+
+        // 批量导入框体
+        function importBoxes() {
+            const text = document.getElementById('importBoxData').value.trim();
+            if (!text) {
+                updateStatus('错误: 请输入框体数据', 'error');
+                return;
+            }
+            
+            const lines = text.split('\n');
+            let imported = 0;
+            
+            for (const line of lines) {
+                const parts = line.trim().split(/\s+/);
+                if (parts.length >= 7) {
+                    const params = {
+                        x: parseFloat(parts[0]) || 0,
+                        y: parseFloat(parts[1]) || 0,
+                        z: parseFloat(parts[2]) || 0,
+                        w: parseFloat(parts[3]) || 1,
+                        l: parseFloat(parts[4]) || 1,
+                        h: parseFloat(parts[5]) || 1,
+                        rt: parseFloat(parts[6]) || 0
+                    };
+                    
+                    const boxId = boxIdCounter++;
+                    const boxMesh = createBoxMesh(
+                        params.x, params.y, params.z,
+                        params.w, params.l, params.h,
+                        params.rt
+                    );
+                    
+                    scene.add(boxMesh);
+                    boxes.push({ id: boxId, mesh: boxMesh, params, isDefault: false });
+                    imported++;
+                }
+            }
+            
+            updateBoxesList();
+            closeImportBoxDialog();
+            document.getElementById('importBoxData').value = '';
+            updateStatus(`成功导入 ${imported} 个框体`, 'success');
+            saveBoxesConfig(); // 保存配置
+        }
+
+        // 保存框体配置到localStorage（只保存非默认框体）
+        function saveBoxesConfig() {
+            const userBoxes = boxes.filter(box => !box.isDefault).map(box => ({
+                params: box.params
+            }));
+            localStorage.setItem('pointcloud_boxes_config', JSON.stringify(userBoxes));
+            console.log('框体配置已保存:', userBoxes.length, '个框体');
+        }
+
+        // 从localStorage加载框体配置
+        function loadBoxesConfig() {
+            try {
+                const saved = localStorage.getItem('pointcloud_boxes_config');
+                if (!saved) {
+                    console.log('未找到保存的框体配置');
+                    return;
+                }
+                
+                const userBoxes = JSON.parse(saved);
+                if (!Array.isArray(userBoxes)) {
+                    console.error('框体配置格式错误');
+                    return;
+                }
+                
+                console.log('加载框体配置:', userBoxes.length, '个框体');
+                
+                userBoxes.forEach(boxData => {
+                    if (!boxData.params) return;
+                    
+                    const boxId = boxIdCounter++;
+                    const params = boxData.params;
+                    
+                    const boxMesh = createBoxMesh(
+                        params.x || 0, params.y || 0, params.z || 0,
+                        params.w || 1, params.l || 1, params.h || 1,
+                        params.rt || 0
+                    );
+                    
+                    scene.add(boxMesh);
+                    
+                    boxes.push({
+                        id: boxId,
+                        mesh: boxMesh,
+                        params: params,
+                        isDefault: false
+                    });
+                });
+                
+                updateBoxesList();
+                console.log('框体配置加载完成');
+            } catch (error) {
+                console.error('加载框体配置失败:', error);
+            }
+        }
+
+        // ==================== 线段管理功能 ====================
+        
+        // 创建线段（不随点云变换）
+        function createLineMesh(x1, y1, z1, x2, y2, z2) {
+            const geometry = new THREE.BufferGeometry().setFromPoints([
+                new THREE.Vector3(x1, y1, z1),
+                new THREE.Vector3(x2, y2, z2)
+            ]);
+            const material = new THREE.LineBasicMaterial({ 
+                color: 0xff0000,
+                linewidth: 2
+            });
+            const line = new THREE.Line(geometry, material);
+            return line;
+        }
+
+        // 添加新线段
+        function addNewLine() {
+            const lineId = lineIdCounter++;
+            const defaultParams = {
+                x1: 0, y1: 0, z1: 0,
+                x2: 1, y2: 1, z2: 1
+            };
+            
+            const lineMesh = createLineMesh(
+                defaultParams.x1, defaultParams.y1, defaultParams.z1,
+                defaultParams.x2, defaultParams.y2, defaultParams.z2
+            );
+            
+            scene.add(lineMesh);
+            
+            const line = {
+                id: lineId,
+                line: lineMesh,
+                params: defaultParams
+            };
+            
+            lines.push(line);
+            updateLinesList();
+            saveLinesConfig(); // 保存配置
+        }
+
+        // 更新线段列表显示
+        function updateLinesList() {
+            const linesList = document.getElementById('linesList');
+            if (!linesList) return;
+            linesList.innerHTML = '';
+            
+            lines.forEach((line, index) => {
+                const lineItem = document.createElement('div');
+                lineItem.className = 'line-item';
+                lineItem.innerHTML = `
+                    <div class="line-header">
+                        <span class="line-title">线段 ${index + 1}</span>
+                        <button class="btn btn-sm btn-danger" onclick="deleteLine(${line.id})" style="padding: 2px 6px; font-size: 10px;">删除</button>
+                    </div>
+                    <div class="line-params">
+                        <div class="param-row">
+                            <span class="param-label-small">起点 X:</span>
+                            <input type="number" class="param-input-small" value="${line.params.x1.toFixed(2)}" step="0.1" 
+                                   onchange="updateLineParam(${line.id}, 'x1', this.value)">
+                        </div>
+                        <div class="param-row">
+                            <span class="param-label-small">起点 Y:</span>
+                            <input type="number" class="param-input-small" value="${line.params.y1.toFixed(2)}" step="0.1" 
+                                   onchange="updateLineParam(${line.id}, 'y1', this.value)">
+                        </div>
+                        <div class="param-row">
+                            <span class="param-label-small">起点 Z:</span>
+                            <input type="number" class="param-input-small" value="${line.params.z1.toFixed(2)}" step="0.1" 
+                                   onchange="updateLineParam(${line.id}, 'z1', this.value)">
+                        </div>
+                        <div class="param-row">
+                            <span class="param-label-small">终点 X:</span>
+                            <input type="number" class="param-input-small" value="${line.params.x2.toFixed(2)}" step="0.1" 
+                                   onchange="updateLineParam(${line.id}, 'x2', this.value)">
+                        </div>
+                        <div class="param-row">
+                            <span class="param-label-small">终点 Y:</span>
+                            <input type="number" class="param-input-small" value="${line.params.y2.toFixed(2)}" step="0.1" 
+                                   onchange="updateLineParam(${line.id}, 'y2', this.value)">
+                        </div>
+                        <div class="param-row">
+                            <span class="param-label-small">终点 Z:</span>
+                            <input type="number" class="param-input-small" value="${line.params.z2.toFixed(2)}" step="0.1" 
+                                   onchange="updateLineParam(${line.id}, 'z2', this.value)">
+                        </div>
+                    </div>
+                `;
+                linesList.appendChild(lineItem);
+            });
+        }
+
+        // 更新线段参数
+        function updateLineParam(lineId, param, value) {
+            const line = lines.find(l => l.id === lineId);
+            if (!line) return;
+            
+            const numValue = parseFloat(value) || 0;
+            line.params[param] = numValue;
+            
+            // 更新线段
+            scene.remove(line.line);
+            line.line.geometry.dispose();
+            line.line.material.dispose();
+            line.line = createLineMesh(
+                line.params.x1, line.params.y1, line.params.z1,
+                line.params.x2, line.params.y2, line.params.z2
+            );
+            scene.add(line.line);
+            saveLinesConfig(); // 保存配置
+        }
+
+        // 删除线段
+        function deleteLine(lineId) {
+            const index = lines.findIndex(l => l.id === lineId);
+            if (index === -1) return;
+            
+            const line = lines[index];
+            scene.remove(line.line);
+            line.line.geometry.dispose();
+            line.line.material.dispose();
+            lines.splice(index, 1);
+            updateLinesList();
+            saveLinesConfig(); // 保存配置
+        }
+
+        // 保存线段配置到localStorage
+        function saveLinesConfig() {
+            const userLines = lines.map(line => ({
+                params: line.params
+            }));
+            localStorage.setItem('pointcloud_lines_config', JSON.stringify(userLines));
+            console.log('线段配置已保存:', userLines.length, '条线段');
+        }
+
+        // 从localStorage加载线段配置
+        function loadLinesConfig() {
+            try {
+                const saved = localStorage.getItem('pointcloud_lines_config');
+                if (!saved) {
+                    console.log('未找到保存的线段配置');
+                    return;
+                }
+                
+                const userLines = JSON.parse(saved);
+                if (!Array.isArray(userLines)) {
+                    console.error('线段配置格式错误');
+                    return;
+                }
+                
+                console.log('加载线段配置:', userLines.length, '条线段');
+                
+                userLines.forEach(lineData => {
+                    if (!lineData.params) return;
+                    
+                    const lineId = lineIdCounter++;
+                    const params = lineData.params;
+                    
+                    const lineMesh = createLineMesh(
+                        params.x1 || 0, params.y1 || 0, params.z1 || 0,
+                        params.x2 || 1, params.y2 || 1, params.z2 || 1
+                    );
+                    
+                    scene.add(lineMesh);
+                    
+                    lines.push({
+                        id: lineId,
+                        line: lineMesh,
+                        params: params
+                    });
+                });
+                
+                updateLinesList();
+                console.log('线段配置加载完成');
+            } catch (error) {
+                console.error('加载线段配置失败:', error);
+            }
+        }
+
+        // ==================== PCD保存功能 ====================
+        
+        // 在两点之间插值生成点（参考C++代码interpolateEdge）
+        function interpolateEdge(x1, y1, z1, x2, y2, z2, step) {
+            const dx = x2 - x1;
+            const dy = y2 - y1;
+            const dz = z2 - z1;
+            const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+            
+            if (len <= 1e-6) {
+                return [{x: x1, y: y1, z: z1}];
+            }
+            
+            const num = Math.max(2, Math.floor(len / step) + 1);
+            const points = [];
+            
+            for (let i = 0; i < num; i++) {
+                const t = i / (num - 1);
+                points.push({
+                    x: x1 + t * dx,
+                    y: y1 + t * dy,
+                    z: z1 + t * dz
+                });
+            }
+            
+            return points;
+        }
+
+        // 计算框体的8个角点（参考C++代码boxCorners）
+        function getBoxCorners(x, y, z, w, l, h, rt) {
+            const hw = w * 0.5;
+            const hl = l * 0.5;
+            const hh = h * 0.5;
+            const yaw = rt * Math.PI / 180;
+            const cosr = Math.cos(yaw);
+            const sinr = Math.sin(yaw);
+            
+            const rot = (x, y) => {
+                return {
+                    x: x * cosr - y * sinr,
+                    y: x * sinr + y * cosr
+                };
+            };
+            
+            const p0 = rot(-hw, -hl);
+            const p1 = rot( hw, -hl);
+            const p2 = rot( hw,  hl);
+            const p3 = rot(-hw,  hl);
+            
+            const z0 = z;
+            const z1 = z + h;
+            
+            return [
+                {x: x + p0.x, y: y + p0.y, z: z0}, // 0
+                {x: x + p1.x, y: y + p1.y, z: z0}, // 1
+                {x: x + p2.x, y: y + p2.y, z: z0}, // 2
+                {x: x + p3.x, y: y + p3.y, z: z0}, // 3
+                {x: x + p0.x, y: y + p0.y, z: z1}, // 4
+                {x: x + p1.x, y: y + p1.y, z: z1}, // 5
+                {x: x + p2.x, y: y + p2.y, z: z1}, // 6
+                {x: x + p3.x, y: y + p3.y, z: z1}  // 7
+            ];
+        }
+        
+        // 保存为PCD文件（包含变换后的点云、框体和线段）
+        function saveAsPCD() {
+            if (!pointCloud || !originalPositions) {
+                updateStatus('错误: 请先加载点云文件', 'error');
+                return;
+            }
+
+            showLoading(true);
+            updateStatus('正在生成PCD文件...', 'info');
+
+            try {
+                // 获取当前变换后的点云数据
+                const geometry = pointCloud.geometry;
+                const positions = geometry.attributes.position.array;
+                const colors = geometry.attributes.color ? geometry.attributes.color.array : null;
+                const pointCount = positions.length / 3;
+
+                // 收集所有点（点云 + 框体边 + 线段）
+                const allPoints = [];
+                const edgeStep = 0.05; // 插值步长（参考C++代码）
+                
+                // 1. 添加原始点云数据
+                for (let i = 0; i < pointCount; i++) {
+                    const x = positions[i * 3];
+                    const y = positions[i * 3 + 1];
+                    const z = positions[i * 3 + 2];
+                    
+                    let intensity = 0;
+                    if (colors) {
+                        const r = colors[i * 3];
+                        const g = colors[i * 3 + 1];
+                        const b = colors[i * 3 + 2];
+                        intensity = (r + g + b) / 3;
+                    }
+                    
+                    allPoints.push({x, y, z, intensity});
+                }
+                
+                // 2. 添加框体边（使用intensity -2.0标识）
+                boxes.forEach((box, idx) => {
+                    const corners = getBoxCorners(
+                        box.params.x, box.params.y, box.params.z,
+                        box.params.w, box.params.l, box.params.h,
+                        box.params.rt
+                    );
+                    
+                    // 12条边
+                    const edges = [
+                        [0,1],[1,2],[2,3],[3,0], // 底部4条边
+                        [4,5],[5,6],[6,7],[7,4], // 顶部4条边
+                        [0,4],[1,5],[2,6],[3,7]  // 垂直4条边
+                    ];
+                    
+                    edges.forEach(([i1, i2]) => {
+                        const c1 = corners[i1];
+                        const c2 = corners[i2];
+                        const edgePoints = interpolateEdge(
+                            c1.x, c1.y, c1.z,
+                            c2.x, c2.y, c2.z,
+                            edgeStep
+                        );
+                        
+                        edgePoints.forEach(p => {
+                            allPoints.push({x: p.x, y: p.y, z: p.z, intensity: -2.0});
+                        });
+                    });
+                });
+                
+                // 3. 添加线段（使用intensity -2.0标识）
+                lines.forEach(line => {
+                    const linePoints = interpolateEdge(
+                        line.params.x1, line.params.y1, line.params.z1,
+                        line.params.x2, line.params.y2, line.params.z2,
+                        edgeStep
+                    );
+                    
+                    linePoints.forEach(p => {
+                        allPoints.push({x: p.x, y: p.y, z: p.z, intensity: -2.0});
+                    });
+                });
+
+                // 构建PCD文件内容
+                const totalPoints = allPoints.length;
+                let pcdContent = `# .PCD v.7 - Point Cloud Data file format
+VERSION .7
+FIELDS x y z intensity
+SIZE 4 4 4 4
+TYPE F F F F
+COUNT 1 1 1 1
+WIDTH ${totalPoints}
+HEIGHT 1
+VIEWPOINT 0 0 0 1 0 0 0
+POINTS ${totalPoints}
+DATA ascii
+`;
+
+                // 添加所有点数据
+                allPoints.forEach(p => {
+                    pcdContent += `${p.x.toFixed(6)}, ${p.y.toFixed(6)}, ${p.z.toFixed(6)}, ${p.intensity.toFixed(6)}\n`;
+                });
+
+                // 创建下载链接
+                const blob = new Blob([pcdContent], { type: 'text/plain' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `pointcloud_${new Date().getTime()}.pcd`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                updateStatus(`成功保存PCD文件（包含 ${pointCount} 个点，${boxes.length} 个框体，${lines.length} 条线段，共 ${totalPoints} 个点）`, 'success');
+                showLoading(false);
+
+            } catch (error) {
+                updateStatus('错误: ' + error.message, 'error');
+                showLoading(false);
+                console.error('保存PCD失败:', error);
+            }
+        }
+
+        // 初始化 - 确保 DOM 完全加载
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', function() {
+                console.log('DOM 加载完成，开始初始化...');
+                // 加载变换配置
+                loadTransformConfig();
+                setTimeout(() => {
+                    initViewer();
+                    // 初始化完成后添加默认框体和加载保存的框体、线段
+                    setTimeout(() => {
+                        addDefaultBox();
+                        loadBoxesConfig();
+                        loadLinesConfig();
+                    }, 200);
+                }, 100);
+            });
+        } else {
+            console.log('DOM 已就绪，开始初始化...');
+            loadTransformConfig();
+                setTimeout(() => {
+                    initViewer();
+                    // 初始化完成后添加默认框体和加载保存的框体、线段
+                    setTimeout(() => {
+                        addDefaultBox();
+                        loadBoxesConfig();
+                        loadLinesConfig();
+                    }, 200);
+                }, 100);
+        }
+    </script>
+</body>
+</html>

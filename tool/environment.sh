@@ -26,10 +26,15 @@ export TensorRT_Lib=/lib/aarch64-linux-gnu/
 export TensorRT_Inc=/usr/include/aarch64-linux-gnu/
 export TensorRT_Bin=/usr/src/tensorrt/bin/
 
-export CUDA_Lib=/usr/local/cuda-11.4/targets/aarch64-linux/lib/
-export CUDA_Inc=/usr/local/cuda-11.4/targets/aarch64-linux/include/
-export CUDA_Bin=/usr/local/cuda-11.4/bin/
-export CUDA_HOME=/usr/local/cuda-11.4/
+# export CUDA_Lib=/usr/local/cuda-11.4/targets/aarch64-linux/lib/
+# export CUDA_Inc=/usr/local/cuda-11.4/targets/aarch64-linux/include/
+# export CUDA_Bin=/usr/local/cuda-11.4/bin/
+# export CUDA_HOME=/usr/local/cuda-11.4/
+
+export CUDA_Lib=/usr/local/cuda-11.8/targets/aarch64-linux/lib/
+export CUDA_Inc=/usr/local/cuda-11.8/targets/aarch64-linux/include/
+export CUDA_Bin=/usr/local/cuda-11.8/bin/
+export CUDA_HOME=/usr/local/cuda-11.8/
 
 export CUDNN_Lib=/lib/aarch64-linux-gnu/
 

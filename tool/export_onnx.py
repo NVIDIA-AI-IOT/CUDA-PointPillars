@@ -29,6 +29,56 @@ from pcdet.config import cfg, cfg_from_yaml_file
 
 from modify_onnx import simplify_preprocess, simplify_postprocess
 
+class ONNXWrapper(torch.nn.Module):
+    """Wrapper class to handle batch_dict input for ONNX export"""
+    def __init__(self, model):
+        super(ONNXWrapper, self).__init__()
+        self.model = model
+        # Set to training mode temporarily to get raw predictions
+        self.model.training = False
+    
+    def forward(self, voxels, voxel_num, voxel_idxs):
+        batch_dict = {
+            'voxels': voxels,
+            'voxel_num_points': voxel_num,
+            'voxel_coords': voxel_idxs,
+            'batch_size': 1
+        }
+        # Forward through network but stop before post_processing
+        for cur_module in self.model.module_list:
+            batch_dict = cur_module(batch_dict)
+            
+            # Check if this is the dense_head and extract predictions
+            if hasattr(cur_module, 'forward_ret_dict'):
+                forward_ret_dict = cur_module.forward_ret_dict
+                if 'cls_preds' in forward_ret_dict:
+                    batch_dict['cls_preds'] = forward_ret_dict['cls_preds']
+                    batch_dict['box_preds'] = forward_ret_dict['box_preds']
+                    if 'dir_cls_preds' in forward_ret_dict:
+                        batch_dict['dir_cls_preds'] = forward_ret_dict['dir_cls_preds']
+                    else:
+                        # Create dummy dir_cls_preds if not present
+                        cls_shape = forward_ret_dict['cls_preds'].shape
+                        batch_dict['dir_cls_preds'] = torch.zeros(
+                            (cls_shape[0], cls_shape[1], cls_shape[2], 2),
+                            dtype=forward_ret_dict['cls_preds'].dtype,
+                            device=forward_ret_dict['cls_preds'].device
+                        )
+        
+        # Extract the predictions from batch_dict
+        # Try multiple possible keys
+        if 'cls_preds' not in batch_dict and 'batch_cls_preds' in batch_dict:
+            # Use batch_cls_preds if available
+            cls_preds = batch_dict['batch_cls_preds'][0]  # Get first item from batch
+            box_preds = batch_dict['batch_box_preds'][0]
+            dir_cls_preds = batch_dict.get('dir_cls_preds', torch.zeros_like(cls_preds))
+        else:
+            cls_preds = batch_dict['cls_preds']
+            box_preds = batch_dict['box_preds']
+            dir_cls_preds = batch_dict.get('dir_cls_preds', torch.zeros_like(cls_preds))
+        
+        return cls_preds, box_preds, dir_cls_preds
+
 class DemoDataset(DatasetTemplate):
     def __init__(self, dataset_cfg, class_names, training=True, root_path=None, logger=None, ext='.bin'):
         """
@@ -98,6 +148,11 @@ def main():
     model.cuda()
     model.eval()
 
+    # Wrap model for ONNX export
+    wrapped_model = ONNXWrapper(model)
+    wrapped_model.cuda()
+    wrapped_model.eval()
+
     np.set_printoptions(threshold=np.inf)
 
     with torch.no_grad():
@@ -119,17 +174,14 @@ def main():
           dtype=torch.int32,
           device='cuda:0')
 
-      dummy_input = dict()
-      dummy_input['voxels'] = dummy_voxels
-      dummy_input['voxel_num_points'] = dummy_voxel_num
-      dummy_input['voxel_coords'] = dummy_voxel_idxs
-      dummy_input['batch_size'] = 1
+      # ONNX export expects tuple of tensors, not dict
+      dummy_input = (dummy_voxels, dummy_voxel_num, dummy_voxel_idxs)
 
-      torch.onnx.export(model,       # model being run
-          dummy_input,               # model input (or a tuple for multiple inputs)
+      torch.onnx.export(wrapped_model,       # model being run
+          dummy_input,               # model input (tuple of tensors)
           os.path.join(args.out_dir, "pointpillar_raw.onnx"),  # where to save the model (can be a file or file-like object)
           export_params=True,        # store the trained parameter weights inside the model file
-          opset_version=11,          # the ONNX version to export the model to
+          opset_version=11,   #17->李玟剑          # the ONNX version to export the model to
           do_constant_folding=True,  # whether to execute constant folding for optimization
           keep_initializers_as_inputs=True,
           input_names = ['voxels', 'voxel_num', 'voxel_idxs'],   # the model's input names

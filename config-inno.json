@@ -1,0 +1,75 @@
+{
+  "center_x": 33.2,
+  "center_y": 4.6,
+  "center_z": -0.7,
+  "range_x": 7.5,
+  "range_y": 25,
+  "range_z": 6,
+  "ry": 0.0,
+  "lane_count": 4,
+  "lidar_model": "../model/pointpillar.plan",
+  "lidar": {
+    "roll": -0.2,
+    "pitch": -100.3,
+    "yaw": -90.0,
+    "x": 38.400,
+    "y": -23.000,
+    "z": 6.300,
+    "ip_address": "10.168.1.62"
+  },
+  "web_service": {
+    "ip": "10.168.1.66",
+    "port": 18874,
+    "timeout_sec": 15
+  },
+  "tracking": {
+    "min_distance": 8.0
+  },
+  "detection": {
+    "score_threshold": 0.25
+  },
+  "draw": {
+    "point_cloud_draw_step": 0.1
+  },
+  "ground_distance_threshold": 0.2,
+  "ground_plane": {
+      "a":  -0.018911,
+      "b":  0.011378,
+      "c":  0.999756,
+      "d":  3.354559
+  },
+  "speed_calib": 0,
+  "speed_line": {
+    "start_x": 45.0,
+    "start_y": -5.0,
+    "start_z": -3.0,
+    "end_x": 0.0,
+    "end_y": -5.0,
+    "end_z": -3.0
+  },
+  "line1": {
+    "start_x": 45.0,
+    "start_y": -6.0,
+    "start_z": -3.0,
+    "end_x": 0.0,
+    "end_y": -6.0,
+    "end_z": -3.0
+  },
+  "line2": {
+    "start_x": 45.0,
+    "start_y": -17.0,
+    "start_z": -3.0,
+    "end_x": 0.0,
+    "end_y": -17.0,
+    "end_z": -3.0
+  },
+  "dbscan": {
+    "use_dbscan": true,
+    "eps_xy": 1.5,
+    "eps_z": 0.11,
+    "max_cluster_ratio": 0.2,
+    "z_threshold": 0.11
+  },
+  "data_points_type": 0,
+  "points_file_path": "/mnt/data/sda/ocm_3/"
+}

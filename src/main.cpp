@@ -18,10 +18,13 @@
 #include <cuda_runtime.h>
 
 #include <string.h>
+#include <math.h>
 #include <iostream>
 #include <sstream>
 #include <fstream>
 #include <dirent.h>
+#include <array>
+#include <algorithm>
 
 #include "pointpillar.hpp"
 #include "common/check.hpp"
@@ -106,6 +109,107 @@ int loadData(const char *file, void **data, unsigned int *length)
     return 0;  
 }
 
+static inline void boxCorners(const pointpillar::lidar::BoundingBox &box, std::array<nvtype::Float3, 8> &corners)
+{
+    const float cx = box.x, cy = box.y, cz = box.z;
+    const float w = box.w, l = box.l, h = box.h;
+    const float yaw = box.rt;
+    const float hw = w * 0.5f, hl = l * 0.5f, hh = h * 0.5f;
+    const float cosr = cosf(yaw), sinr = sinf(yaw);
+    auto rot = [&](float x, float y) {
+        return nvtype::Float2(x * cosr - y * sinr, x * sinr + y * cosr);
+    };
+
+    nvtype::Float2 p0 = rot(-hw, -hl);
+    nvtype::Float2 p1 = rot( hw, -hl);
+    nvtype::Float2 p2 = rot( hw,  hl);
+    nvtype::Float2 p3 = rot(-hw,  hl);
+
+    float z0 = cz - hh;
+    float z1 = cz + hh;
+
+    corners[0] = nvtype::Float3(cx + p0.x, cy + p0.y, z0);
+    corners[1] = nvtype::Float3(cx + p1.x, cy + p1.y, z0);
+    corners[2] = nvtype::Float3(cx + p2.x, cy + p2.y, z0);
+    corners[3] = nvtype::Float3(cx + p3.x, cy + p3.y, z0);
+    corners[4] = nvtype::Float3(cx + p0.x, cy + p0.y, z1);
+    corners[5] = nvtype::Float3(cx + p1.x, cy + p1.y, z1);
+    corners[6] = nvtype::Float3(cx + p2.x, cy + p2.y, z1);
+    corners[7] = nvtype::Float3(cx + p3.x, cy + p3.y, z1);
+}
+
+static inline void interpolateEdge(const nvtype::Float3 &a, const nvtype::Float3 &b, float step, std::vector<nvtype::Float4> &out)
+{
+    const float dx = b.x - a.x;
+    const float dy = b.y - a.y;
+    const float dz = b.z - a.z;
+    const float len = sqrtf(dx * dx + dy * dy + dz * dz);
+    if (len <= 1e-6f) {
+        out.emplace_back(nvtype::Float4(a.x, a.y, a.z, 255.0f));
+        return;
+    }
+    int num = std::max(2, (int)(len / step) + 1);
+    for (int i = 0; i < num; ++i) {
+        float t = (float)i / (float)(num - 1);
+        out.emplace_back(nvtype::Float4(a.x + t * dx, a.y + t * dy, a.z + t * dz, 255.0f));
+    }
+}
+
+void SaveBoxesAsPCD(const std::vector<pointpillar::lidar::BoundingBox> &boxes,
+                    const float *points_xyzi,
+                    int num_points,
+                    const std::string &file_name,
+                    float edge_step = 0.05f)
+{
+    std::vector<nvtype::Float4> line_points;
+    line_points.reserve((size_t)boxes.size() * 12 * 20);
+
+    for (const auto &b : boxes) {
+        // if(b.score < 0.12) 
+        //     continue;
+        std::array<nvtype::Float3, 8> cs;
+        boxCorners(b, cs);
+        const int edges[12][2] = {
+            {0,1},{1,2},{2,3},{3,0},
+            {4,5},{5,6},{6,7},{7,4},
+            {0,4},{1,5},{2,6},{3,7}
+        };
+        for (int e = 0; e < 12; ++e) {
+            interpolateEdge(cs[edges[e][0]], cs[edges[e][1]], edge_step, line_points);
+        }
+    }
+
+    std::ofstream ofs;
+    ofs.open(file_name, std::ios::out);
+    if (!ofs.is_open()) {
+        std::cerr << "Output PCD file cannot be opened!" << std::endl;
+        return;
+    }
+
+    const size_t total_points = (size_t)num_points + line_points.size();
+    ofs << "# .PCD v.7 - Point Cloud Data file format\n";
+    ofs << "VERSION .7\n";
+    ofs << "FIELDS x y z intensity\n";
+    ofs << "SIZE 4 4 4 4\n";
+    ofs << "TYPE F F F F\n";
+    ofs << "COUNT 1 1 1 1\n";
+    ofs << "WIDTH " << total_points << "\n";
+    ofs << "HEIGHT 1\n";
+    ofs << "VIEWPOINT 0 0 0 1 0 0 0\n";
+    ofs << "POINTS " << total_points << "\n";
+    ofs << "DATA ascii\n";
+
+    for (int i = 0; i < num_points; ++i) {
+        const float *p = points_xyzi + i * 4;
+        ofs << p[0] << ", " << p[1] << ", " << p[2] << ", " << p[3] << "\n";
+    }
+    for (const auto &q : line_points) {
+        ofs << q.x << ", " << q.y << ", " << q.z << ", " << q.w << "\n";
+    }
+    ofs.close();
+    std::cout << "Saved PCD with boxes in: " << file_name << std::endl;
+}
+
 void SaveBoxPred(std::vector<pointpillar::lidar::BoundingBox> boxes, std::string file_name)
 {
     std::ofstream ofs;
@@ -121,6 +225,32 @@ void SaveBoxPred(std::vector<pointpillar::lidar::BoundingBox> boxes, std::string
           ofs << box.rt << " ";
           ofs << box.id << " ";
           ofs << box.score << "\n";
+        }
+    }
+    else {
+      std::cerr << "Output file cannot be opened!" << std::endl;
+    }
+    ofs.close();
+    std::cout << "Saved prediction in: " << file_name << std::endl;
+    return;
+};
+
+void SaveBoxPredToLabels(std::vector<pointpillar::lidar::BoundingBox> boxes, std::string file_name)
+{
+    std::ofstream ofs;
+    ofs.open(file_name, std::ios::out);
+    if (ofs.is_open()) {
+        for (const auto box : boxes) {
+        if(box.l>70)
+            continue;
+          ofs <<"Car 0 0 0 0 0 0 0 ";
+          ofs << box.h << " ";
+          ofs << box.l << " ";
+          ofs << box.w << " ";
+          ofs << box.x << " ";
+          ofs << box.y << " ";
+          ofs << box.z << " ";
+          ofs << ((box.rt*180/3.1415926)-180) /180*3.1415926 << "\n";
         }
     }
     else {
@@ -230,10 +360,37 @@ int main(int argc, char** argv) {
         std::cout << "Lidar points count: "<< points_size <<std::endl;
     
         auto bboxes = core->forward((float *)buffer.get(), points_size, stream);
+        // 过滤掉置信度过低的框
+        bboxes.erase(
+            std::remove_if(
+                bboxes.begin(),
+                bboxes.end(),
+                [](const pointpillar::lidar::BoundingBox& box) { return box.score < 0.25f; }),
+            bboxes.end());
+
+        // 把ROI 区域添加进框里面
+        {
+            const float min_x = 0.0f,     min_y = -39.68f, min_z = -3.0f;
+            const float max_x = 69.12f,   max_y = 39.68f,  max_z =  1.0f;
+            const float cx = (min_x + max_x) * 0.5f;
+            const float cy = (min_y + max_y) * 0.5f;
+            const float cz = min_z;
+            const float w  = (max_x - min_x);
+            const float l  = (max_y - min_y);
+            const float h  = (max_z - min_z);
+            pointpillar::lidar::BoundingBox range_box(cx, cy, cz, w, l, h, 0.0f, -1, 1.0f);
+            bboxes.push_back(range_box);
+        }
         std::cout<<"Detections after NMS: "<< bboxes.size()<<std::endl;
 
         std::string save_file_name = std::string(out_dir) + file + ".txt";
         SaveBoxPred(bboxes, save_file_name);
+
+        std::string save_file_name_labels = std::string(out_dir) +std::string("labels/")+ file + ".txt";
+        SaveBoxPredToLabels(bboxes, save_file_name_labels);
+
+        std::string save_pcd_name = std::string(out_dir) + file + "_boxes.pcd";
+        SaveBoxesAsPCD(bboxes, (float *)buffer.get(), points_size, save_pcd_name, 0.05f);
 
         std::cout << ">>>>>>>>>>>" << std::endl;
     }

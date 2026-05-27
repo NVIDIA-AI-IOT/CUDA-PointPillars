@@ -1,8 +1,12 @@
 .vscode
 build
+build_unix
 ckpts
 data
-model/pointpillar_raw.onnx
-model/*.plan
+model*
 workspace
 **/__pycache__
+.vs
+.cursorrules
+cumm-0.4.8
+spconv-2.3.6

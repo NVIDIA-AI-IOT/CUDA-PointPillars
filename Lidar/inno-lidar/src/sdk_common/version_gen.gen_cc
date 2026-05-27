@@ -1,0 +1,9 @@
+/**
+ *  Copyright (C) 2021 - Innovusion Inc.
+ *
+ *  All Rights Reserved.
+ *
+ */
+
+const static char inno_api_version_g[] = "3.102.6.20241107082259";
+const static char inno_api_build_tag_g[] = "release-client-sdk-3.102.6-arm";
